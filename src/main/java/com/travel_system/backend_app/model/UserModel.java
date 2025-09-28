@@ -3,6 +3,7 @@ package com.travel_system.backend_app.model;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
 import java.util.Objects;
@@ -12,6 +13,8 @@ import java.util.UUID;
 @Table(name = "user_model")
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
+@EntityListeners(AuditingEntityListener.class)
+
 public abstract class UserModel {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -29,6 +32,8 @@ public abstract class UserModel {
     private LocalDateTime createdAt;
     @LastModifiedDate
     private LocalDateTime updatedAt;
+
+    public UserModel() {}
 
     public UserModel(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
