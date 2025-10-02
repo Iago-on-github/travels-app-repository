@@ -19,14 +19,24 @@ public class Student extends UserModel {
     @Column(nullable = false)
     private Role role;
 
-
-    public Student() {}
+    public Student() {
+    }
 
     public Student(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, LocalDateTime createdAt, LocalDateTime updatedAt, InstitutionType institutionType, String course, StatusStudent status) {
         super(id, email, password, name, lastName, telephone, profilePicture, createdAt, updatedAt);
         this.institutionType = institutionType;
         this.course = course;
-        this.status = status;
+        this.status = StatusStudent.ACTIVE;
+        this.role = Role.ROLE_USER;
+    }
+
+    public Student(String email, String password, String name, String lastName,
+                   String telephone, String profilePicture, InstitutionType institutionType,
+                   String course, StatusStudent status, Role role) {
+        super(email, password, name, lastName, telephone, profilePicture);
+        this.institutionType = institutionType;
+        this.course = course;
+        this.status = StatusStudent.ACTIVE;
         this.role = Role.ROLE_USER;
     }
 

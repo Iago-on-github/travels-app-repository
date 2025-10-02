@@ -14,7 +14,6 @@ import java.util.UUID;
 @Inheritance(strategy = InheritanceType.SINGLE_TABLE)
 @DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
 @EntityListeners(AuditingEntityListener.class)
-
 public abstract class UserModel {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -45,6 +44,15 @@ public abstract class UserModel {
         this.profilePicture = profilePicture;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
+    }
+
+    public UserModel(String email, String password, String name, String lastName, String telephone, String profilePicture) {
+        this.email = email;
+        this.password = password;
+        this.name = name;
+        this.lastName = lastName;
+        this.telephone = telephone;
+        this.profilePicture = profilePicture;
     }
 
     public UUID getId() {
