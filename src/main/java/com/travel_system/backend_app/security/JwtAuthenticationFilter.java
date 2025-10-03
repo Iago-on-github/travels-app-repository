@@ -1,6 +1,6 @@
 package com.travel_system.backend_app.security;
 
-import com.travel_system.backend_app.Service.AuthService;
+import com.travel_system.backend_app.service.AuthService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

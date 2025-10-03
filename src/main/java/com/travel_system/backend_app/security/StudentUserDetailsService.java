@@ -1,6 +1,6 @@
 package com.travel_system.backend_app.security;
 
-import com.travel_system.backend_app.Repository.UserModelRepository;
+import com.travel_system.backend_app.repository.UserModelRepository;
 import com.travel_system.backend_app.model.Student;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;

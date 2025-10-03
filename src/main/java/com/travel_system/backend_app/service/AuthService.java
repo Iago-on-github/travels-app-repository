@@ -1,4 +1,4 @@
-package com.travel_system.backend_app.Service;
+package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.security.StudentUserDetails;
 import com.travel_system.backend_app.security.StudentUserDetailsService;

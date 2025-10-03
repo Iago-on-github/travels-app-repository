@@ -1,6 +1,6 @@
-package com.travel_system.backend_app.Service;
+package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.Repository.UserModelRepository;
+import com.travel_system.backend_app.repository.UserModelRepository;
 import com.travel_system.backend_app.customExceptions.NoStudentsFoundException;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
@@ -59,7 +59,7 @@ public class StudentService {
     }
 
     @Transactional
-    public StudentResponseDTO updateLoggedStudent(UUID currentID, String authenticatedUserEmail, StudentRequestDTO requestDTO) {
+    public StudentResponseDTO updateLoggedStudent(String authenticatedUserEmail, StudentRequestDTO requestDTO) {
         Student existingStudent = (Student) repository.findByEmail(authenticatedUserEmail)
                 .orElseThrow(() -> new RuntimeException("Estudante não encontrado, " + authenticatedUserEmail));
 
