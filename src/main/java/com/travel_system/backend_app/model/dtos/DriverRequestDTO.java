@@ -1,14 +1,12 @@
 package com.travel_system.backend_app.model.dtos;
 
-import com.travel_system.backend_app.model.enums.InstitutionType;
-
-public record StudentRequestDTO(
+public record DriverRequestDTO(
         String email,
         String password,
         String name,
         String lastName,
         String telephone,
         String profilePicture,
-        InstitutionType institutionType,
-        String course) {
+        String areaOfActivity
+) {
 }

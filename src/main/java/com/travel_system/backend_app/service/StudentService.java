@@ -1,15 +1,17 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.customExceptions.NoStudentsOrDriversFoundException;
 import com.travel_system.backend_app.repository.UserModelRepository;
-import com.travel_system.backend_app.customExceptions.NoStudentsFoundException;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
 import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
 import com.travel_system.backend_app.model.enums.Role;
-import com.travel_system.backend_app.model.enums.StatusStudent;
+import com.travel_system.backend_app.model.enums.GeneralStatus;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -19,38 +21,43 @@ import java.util.UUID;
 @Service
 public class StudentService {
     private UserModelRepository repository;
+    private PasswordEncoder passwordEncoder;
 
     @Autowired
-    public StudentService(UserModelRepository repository) {
+    public StudentService(UserModelRepository repository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     // na tabela 'userModel', chama apenas instancias de Student
     public List<StudentResponseDTO> getAllStudents() {
         List<UserModel> getAllStudents = repository.findAll();
-        if (getAllStudents.isEmpty()) throw new NoStudentsFoundException("Estudantes não encontrados.");
+        if (getAllStudents.isEmpty()) throw new NoStudentsOrDriversFoundException("Estudantes não encontrados.");
         return getAllStudents.stream()
                 .filter(student -> student instanceof Student)
                 .map(user -> studentConverted((Student) user)).toList();
     }
 
     public List<StudentResponseDTO> getAllActiveStudents() {
-        return getStudentsByStatus(StatusStudent.ACTIVE, "sem estudantes ativos.");
+        return getStudentsByStatus(GeneralStatus.ACTIVE, "sem estudantes ativos.");
     }
 
     public List<StudentResponseDTO> getAllInactiveStudents() {
-        return getStudentsByStatus(StatusStudent.INACTIVE, "sem estudantes inativos.");
+        return getStudentsByStatus(GeneralStatus.INACTIVE, "sem estudantes inativos.");
     }
 
     @Transactional
     public StudentResponseDTO createStudent(StudentRequestDTO requestDTO) {
         Student newStudent = studentMapper(requestDTO);
 
-        newStudent.setRole(Role.ROLE_USER);
-        newStudent.setstatus(StatusStudent.ACTIVE);
+        // cryptography the password
+        String rawPassword = newStudent.getPassword();
+        String encodedPassword = passwordEncoder.encode(rawPassword);
+        newStudent.setPassword(encodedPassword);
 
         Optional<UserModel> email = repository.findByEmail(newStudent.getEmail());
         Optional<UserModel> telephone = repository.findByTelephone(newStudent.getTelephone());
+
         if (email.isPresent()) throw new RuntimeException("Email já existe");
         if (telephone.isPresent()) throw new RuntimeException("Telefone já existe");
 
@@ -63,8 +70,7 @@ public class StudentService {
         Student existingStudent = (Student) repository.findByEmail(authenticatedUserEmail)
                 .orElseThrow(() -> new RuntimeException("Estudante não encontrado, " + authenticatedUserEmail));
 
-        StatusStudent inactive = StatusStudent.INACTIVE;
-        if (existingStudent.getstatus() == inactive) {
+        if (existingStudent.getStatus().equals(GeneralStatus.INACTIVE)) {
           throw new RuntimeException("Não é possível modificar dados de uma conta inativa.");
         }
 
@@ -90,16 +96,34 @@ public class StudentService {
     }
 
     public StudentResponseDTO getLoggedInStudentProfile(String email, String telephone) {
-        Student student = repository.findByEmailOrTelephone(email, telephone)
+        Student student = (Student) repository.findByEmailOrTelephone(email, telephone)
                 .orElseThrow(() -> new RuntimeException("Usuário não encontrato."));
 
         return studentConverted(student);
     }
 
-    private List<StudentResponseDTO> getStudentsByStatus(StatusStudent status, String exceptionMessage) {
-        List<Student> students = repository.findAllByStatus(status);
-        if (students.isEmpty()) throw new NoStudentsFoundException(exceptionMessage);
-        return students.stream().map(this::studentConverted).toList();
+    @Transactional
+    public void disableStudent(UUID id) {
+        Optional<UserModel> student = repository.findById(id);
+        UserModel userModel = student.orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado, " + id));
+
+        if (userModel instanceof Student studentRequest) {
+            if (studentRequest.getStatus().equals(GeneralStatus.INACTIVE)) {
+                throw new IllegalStateException("Estudante já desativado, " + id);
+            }
+            studentRequest.setStatus(GeneralStatus.INACTIVE);
+            repository.save(studentRequest);
+        } else {
+            throw new IllegalArgumentException("Usuário não é um estudante, " + id);
+        }
+    }
+
+    private List<StudentResponseDTO> getStudentsByStatus(GeneralStatus status, String exceptionMessage) {
+        List<UserModel> students = repository.findAllByStatus(status);
+        if (students.isEmpty()) throw new NoStudentsOrDriversFoundException(exceptionMessage);
+        return students.stream().filter(student -> student instanceof Student)
+                .map(student -> studentConverted((Student) student))
+                .toList();
     }
 
     private Student studentMapper(StudentRequestDTO requestDTO) {
@@ -127,7 +151,7 @@ public class StudentService {
                 student.getCreatedAt(),
                 student.getInstitutionType(),
                 student.getCourse(),
-                student.getstatus()
+                student.getStatus()
         );
     }
 }

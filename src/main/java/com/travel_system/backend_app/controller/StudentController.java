@@ -55,4 +55,10 @@ public class StudentController {
     public ResponseEntity<StudentResponseDTO> updateStudent(@PathVariable String authenticatedUserEmail, @RequestBody StudentRequestDTO studentRequestDTO) {
         return ResponseEntity.ok().body(studentService.updateLoggedStudent(authenticatedUserEmail, studentRequestDTO));
     }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Void> disableStudent(@PathVariable UUID id) {
+        studentService.disableStudent(id);
+        return ResponseEntity.ok().build();
+    }
 }
