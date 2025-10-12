@@ -2,12 +2,11 @@ package com.travel_system.backend_app.model;
 
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.Role;
-import jakarta.persistence.DiscriminatorValue;
-import jakarta.persistence.Entity;
-import jakarta.persistence.EnumType;
-import jakarta.persistence.Enumerated;
+import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -17,6 +16,8 @@ public class Driver extends UserModel {
     private Role role;
     private String areaOfActivity;
     private Integer totalTrips;
+    @OneToMany(mappedBy = "driver")
+    private List<Travel> travels = new ArrayList<>();
 
     public Driver() {
     }
@@ -50,5 +51,13 @@ public class Driver extends UserModel {
 
     public void setTotalTrips(Integer totalTrips) {
         this.totalTrips = totalTrips;
+    }
+
+    public List<Travel> getTravels() {
+        return travels;
+    }
+
+    public void setTravels(List<Travel> travels) {
+        this.travels = travels;
     }
 }

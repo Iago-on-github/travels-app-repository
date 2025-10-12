@@ -1,6 +1,8 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.customExceptions.NoStudentsOrDriversFoundException;
+import com.travel_system.backend_app.model.StudentTravel;
+import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.UserModelRepository;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
@@ -21,13 +23,17 @@ import java.util.UUID;
 @Service
 public class StudentService {
     private UserModelRepository repository;
+    private StudentTravelRepository studentTravelRepository;
     private PasswordEncoder passwordEncoder;
 
-    @Autowired
-    public StudentService(UserModelRepository repository, PasswordEncoder passwordEncoder) {
+    public StudentService(UserModelRepository repository, StudentTravelRepository studentTravelRepository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
+        this.studentTravelRepository = studentTravelRepository;
         this.passwordEncoder = passwordEncoder;
     }
+
+    @Autowired
+
 
     // na tabela 'userModel', chama apenas instancias de Student
     public List<StudentResponseDTO> getAllStudents() {
@@ -153,5 +159,19 @@ public class StudentService {
                 student.getCourse(),
                 student.getStatus()
         );
+    }
+
+    // haverá um popup no front que perguntará se o estudante irá participar da viagem
+    public void confirmEmbarkOnTravel(UUID studentId, UUID travelId) {
+        StudentTravel studentTravel = studentTravelRepository
+                .findByStudentIdAndTravelId(studentId, travelId)
+                .orElseThrow(() -> new RuntimeException("Associação travel e student não encontrada"));
+
+        if (studentTravel.isEmbark()) {
+            throw new RuntimeException("embarque já confirmado");
+        }
+
+        studentTravel.setEmbark(true);
+        studentTravelRepository.save(studentTravel);
     }
 }

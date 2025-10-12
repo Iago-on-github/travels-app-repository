@@ -1,10 +1,8 @@
 package com.travel_system.backend_app.controller;
 
-import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
 import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
 import com.travel_system.backend_app.service.StudentService;
-import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -59,6 +57,12 @@ public class StudentController {
     @PutMapping("/{id}")
     public ResponseEntity<Void> disableStudent(@PathVariable UUID id) {
         studentService.disableStudent(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/confirmEmbark")
+    public ResponseEntity<Void> confirmStudentEmbark(@RequestParam UUID studentId, @RequestParam UUID travelId) {
+        studentService.confirmEmbarkOnTravel(studentId, travelId);
         return ResponseEntity.ok().build();
     }
 }

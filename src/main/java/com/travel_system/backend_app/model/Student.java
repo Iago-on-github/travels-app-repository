@@ -6,6 +6,8 @@ import com.travel_system.backend_app.model.enums.GeneralStatus;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -17,6 +19,8 @@ public class Student extends UserModel {
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private Role role;
+    @OneToMany(mappedBy = "student")
+    private Set<StudentTravel> studentTravels = new HashSet<>();
 
     public Student() {
     }
@@ -60,5 +64,13 @@ public class Student extends UserModel {
 
     public void setRole(Role role) {
         this.role = role;
+    }
+
+    public Set<StudentTravel> getStudentTravels() {
+        return studentTravels;
+    }
+
+    public void setStudentTravels(Set<StudentTravel> studentTravels) {
+        this.studentTravels = studentTravels;
     }
 }
