@@ -1,16 +1,20 @@
 package com.travel_system.backend_app.config;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.function.client.WebClient;
 
 @Configuration
-public class MapboxConfig {
+public class WebClientConfig {
+
+    @Value("${mapbox.base-url}")
+    private String mapboxBaseUrl;
 
     @Bean
     public WebClient webClient() {
         return WebClient.builder()
-                .baseUrl("https://api.mapbox.com/directions/v5/")
+                .baseUrl(mapboxBaseUrl)
                 .build();
     }
 }
