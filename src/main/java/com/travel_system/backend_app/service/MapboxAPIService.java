@@ -2,12 +2,12 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.interfaces.MapboxAPICalling;
 import com.travel_system.backend_app.model.dtos.mapboxApi.MapboxApiResponse;
-import org.apache.tomcat.websocket.server.UriTemplate;
+import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
+import com.travel_system.backend_app.model.dtos.mapboxApi.RoutesDTO;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.util.UriBuilder;
 
 @Service
 public class MapboxAPIService implements MapboxAPICalling {
@@ -22,7 +22,7 @@ public class MapboxAPIService implements MapboxAPICalling {
     }
 
     @Override
-    public MapboxApiResponse calculateRoute(double originLong, double originLat, double destLong, double destLat) {
+    public RouteDetailsDTO calculateRoute(double originLong, double originLat, double destLong, double destLat) {
         String waypoints = originLong + "," + originLat + ";" + destLong + "," + destLat;
 
         return webClient.get()
@@ -34,6 +34,21 @@ public class MapboxAPIService implements MapboxAPICalling {
                         .build(waypoints))
                 .retrieve()
                 .bodyToMono(MapboxApiResponse.class)
+                .map(this::RouteDetailsMapper)
                 .block();
+    }
+
+    private RouteDetailsDTO RouteDetailsMapper(MapboxApiResponse mapboxApiResponse) {
+        if (mapboxApiResponse.routes().isEmpty()) {
+            throw new RuntimeException("Routes is empty.");
+        }
+
+        RoutesDTO routesDto = mapboxApiResponse.routes().getFirst();
+
+        return new RouteDetailsDTO(
+                Math.round(routesDto.distance()),
+                Math.round(routesDto.duration()),
+                routesDto.geometry()
+        );
     }
 }
