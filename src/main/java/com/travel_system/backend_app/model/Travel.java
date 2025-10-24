@@ -23,6 +23,7 @@ public class Travel {
     @OneToMany(mappedBy = "travel")
     private Set<StudentTravel> studentTravels = new HashSet<>();
     private Instant startHourTravel;
+    private Instant endHourTravel;
 
     // rota (estáticos)
     private String polylineRoute;
@@ -40,11 +41,13 @@ public class Travel {
     public Travel() {
     }
 
-    public Travel(UUID id, TravelStatus travelStatus, Driver driver, Instant startHourTravel, String polylineRoute, Long duration, Long distance, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude) {
+    public Travel(UUID id, TravelStatus travelStatus, Driver driver, Set<StudentTravel> studentTravels, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Long duration, Long distance, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude) {
         this.id = id;
         this.travelStatus = travelStatus;
         this.driver = driver;
+        this.studentTravels = studentTravels;
         this.startHourTravel = startHourTravel;
+        this.endHourTravel = endHourTravel;
         this.polylineRoute = polylineRoute;
         this.duration = duration;
         this.distance = distance;
@@ -92,6 +95,14 @@ public class Travel {
 
     public void setStartHourTravel(Instant startHourTravel) {
         this.startHourTravel = startHourTravel;
+    }
+
+    public Instant getEndHourTravel() {
+        return endHourTravel;
+    }
+
+    public void setEndHourTravel(Instant endHourTravel) {
+        this.endHourTravel = endHourTravel;
     }
 
     public String getPolylineRoute() {

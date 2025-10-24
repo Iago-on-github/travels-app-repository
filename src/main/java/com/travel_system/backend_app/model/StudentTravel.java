@@ -19,13 +19,18 @@ public class StudentTravel {
     private Student student;
     private boolean embark = false;
     private Instant embarkHour;
+    private Instant disembarkHour;
 
-    public StudentTravel(UUID id, Travel travel, Student student, boolean embark, Instant embarkHour) {
+    public StudentTravel() {
+    }
+
+    public StudentTravel(UUID id, Travel travel, Student student, boolean embark, Instant embarkHour, Instant disembarkHour) {
         this.id = id;
         this.travel = travel;
         this.student = student;
         this.embark = embark;
         this.embarkHour = embarkHour;
+        this.disembarkHour = disembarkHour;
     }
 
     public UUID getId() {
@@ -66,5 +71,13 @@ public class StudentTravel {
 
     public void setEmbarkHour(Instant embarkHour) {
         this.embarkHour = embarkHour;
+    }
+
+    public Instant getDisembarkHour() {
+        return disembarkHour;
+    }
+
+    public void setDisembarkHour(Instant disembarkHour) {
+        this.disembarkHour = disembarkHour;
     }
 }

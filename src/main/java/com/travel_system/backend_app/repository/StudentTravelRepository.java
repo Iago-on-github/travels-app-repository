@@ -10,4 +10,6 @@ import java.util.UUID;
 @Repository
 public interface StudentTravelRepository extends JpaRepository<StudentTravel, UUID> {
     Optional<StudentTravel> findByStudentIdAndTravelId(UUID studentId, UUID travelId);
+
+    Optional<StudentTravel> findByTravelIdAndStudentId(UUID id, UUID studentId);
 }

@@ -2,12 +2,9 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.customExceptions.NoStudentsOrDriversFoundException;
 import com.travel_system.backend_app.model.Driver;
-import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.DriverRequestDTO;
 import com.travel_system.backend_app.model.dtos.DriverResponseDTO;
-import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
-import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.repository.UserModelRepository;
 import jakarta.persistence.EntityNotFoundException;
