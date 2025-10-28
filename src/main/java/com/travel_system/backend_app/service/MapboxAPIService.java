@@ -3,10 +3,13 @@ package com.travel_system.backend_app.service;
 import com.mapbox.geojson.Point;
 import com.mapbox.geojson.utils.PolylineUtils;
 import com.travel_system.backend_app.interfaces.MapboxAPICalling;
+import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.MapboxApiResponse;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDeviationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RoutesDTO;
+import com.travel_system.backend_app.repository.TravelRepository;
+import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -20,12 +23,15 @@ public class MapboxAPIService implements MapboxAPICalling {
     private String accessToken;
 
     private WebClient webClient;
+    private TravelRepository travelRepository;
 
     @Autowired
-    public MapboxAPIService(WebClient webClient) {
+    public MapboxAPIService(TravelRepository travelRepository, WebClient webClient) {
+        this.travelRepository = travelRepository;
         this.webClient = webClient;
     }
 
+    // chamada bruta da api
     @Override
     public RouteDetailsDTO calculateRoute(double originLong, double originLat, double destLong, double destLat) {
         String waypoints = originLong + "," + originLat + ";" + destLong + "," + destLat;
@@ -45,13 +51,11 @@ public class MapboxAPIService implements MapboxAPICalling {
 
     // verifica se a rota foi desviada do padrão
     public RouteDeviationDTO isRouteDeviation(double currentLat, double currentLong, String polylineRoute) {
-        final int precision = 5;
-
         double minDistance = Double.MAX_VALUE;
         double projLng = 0;
         double projLat = 0;
 
-        List<Point> decodePolyline = PolylineUtils.decode(polylineRoute, precision);
+        List<Point> decodePolyline = FormattedPolyline(polylineRoute);
         Point driverCurrentLoc = Point.fromLngLat(currentLong, currentLat);
 
         if (decodePolyline.size() < 2) {
@@ -96,6 +100,41 @@ public class MapboxAPIService implements MapboxAPICalling {
                 projLat,
                 projLng
         );
+    }
+
+    // retorna distância/tempo restante com base na localização atual
+    public RouteDetailsDTO recalculateETA(double currentLng, double currentLat, double finalLong, double finalLat) {
+        RouteDetailsDTO routeDetails = calculateRoute(currentLng, currentLat, finalLong, finalLat);
+
+        if (routeDetails == null) throw new RuntimeException("Sem dados de rota");
+
+        return routeDetails;
+    }
+
+    // salva os dados de distance, duration e polyline na entidade Travel
+    @Transactional
+    public void getRouteDetailsDTO(double originLong, double originLat, double destLong, double destLat) {
+        RouteDetailsDTO staticRouteDetails = calculateRoute(originLong, originLat, destLong, destLat);
+
+        if (staticRouteDetails == null) throw new RuntimeException("Dados de rota estão nulos");
+
+        travelRepository.save(travelMapper(staticRouteDetails));
+    }
+
+    // padroniza a decodificação do polyline
+    private List<Point> FormattedPolyline(String polylineRoute) {
+        int precision = 5;
+        return PolylineUtils.decode(polylineRoute, precision);
+    }
+
+    private Travel travelMapper(RouteDetailsDTO routeDetailsDTO) {
+        Travel travelEntity = new Travel();
+
+        travelEntity.setDistance(routeDetailsDTO.distance());
+        travelEntity.setDuration(routeDetailsDTO.duration());
+        travelEntity.setPolylineRoute(routeDetailsDTO.geometry());
+
+        return travelEntity;
     }
 
     private RouteDetailsDTO RouteDetailsMapper(MapboxApiResponse mapboxApiResponse) {
