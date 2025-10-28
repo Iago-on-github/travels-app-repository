@@ -1,5 +1,6 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.customExceptions.TravelException;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
@@ -14,8 +15,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -147,6 +146,6 @@ public class TravelService {
     }
 
     private void throwTravelException(String msg) {
-        throw new RuntimeException(msg);
+        throw new TravelException(msg);
     }
 }

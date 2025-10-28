@@ -29,6 +29,7 @@
 	<properties>
 		<java.version>21</java.version>
 	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -98,7 +99,13 @@
             <artifactId>spring-boot-starter-webflux</artifactId>
         </dependency>
 
-	</dependencies>
+        <dependency>
+            <groupId>com.mapbox.mapboxsdk</groupId>
+            <artifactId>mapbox-sdk-geojson</artifactId>
+            <version>5.8.0</version>
+        </dependency>
+
+    </dependencies>
 
 	<build>
 		<plugins>
@@ -108,5 +115,4 @@
 			</plugin>
 		</plugins>
 	</build>
-
 </project>
