@@ -23,13 +23,15 @@ public class TravelService {
     private StudentTravelRepository studentTravelRepository;
     private UserModelRepository userModelRepository;
     private MapboxAPIService mapboxAPIService;
+    private RedisTrackingService redisTrackingService;
 
     @Autowired
-    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, UserModelRepository userModelRepository, MapboxAPIService mapboxAPIService) {
+    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, UserModelRepository userModelRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService) {
         this.travelRepository = travelRepository;
         this.studentTravelRepository = studentTravelRepository;
         this.userModelRepository = userModelRepository;
         this.mapboxAPIService = mapboxAPIService;
+        this.redisTrackingService = redisTrackingService;
     }
 
     @Transactional
@@ -83,6 +85,7 @@ public class TravelService {
         });
 
         travelRepository.save(actualTrip);
+        redisTrackingService.deleteTrackingData(String.valueOf(travelId));
     }
 
     @Transactional
