@@ -24,8 +24,8 @@ public class RedisTrackingService {
     public void storeLiveLocation(String travelId, String currentLat, String currentLng, String timeStamp) {
         String key = HASH_KEY_PREFIX + travelId;
 
-        if (travelId == null || currentLat == null || currentLng == null || timeStamp == null) {
-            throw new RuntimeException("Não foi possivel armazenar os dados corretamente.");
+        if (travelId == null) {
+            throw new RuntimeException("travelId não informado, " + travelId);
         }
 
         Map<String, String> data = new HashMap<>();

@@ -22,6 +22,13 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class RedisTrackingServiceTest {
 
+    /*
+    AS FASES DE CADA TESTE:
+
+    - SETUP (CONFIGURAÇÃO INICIAL)
+    - CENÁRIO DE SUCESSO (SUCCESS)
+    - CENÁRIO DE ERRO (THROW EXCEPTION)
+    */
     private RedisTrackingService redisTrackingService;
 
     private final String travelId = UUID.randomUUID().toString();
@@ -31,13 +38,16 @@ class RedisTrackingServiceTest {
     private final String HASH_KEY_PREFIX = "travelId:";
     private final String expectedRedisKey = HASH_KEY_PREFIX + travelId;
 
+    private RedisTemplate<String, Object> redisTemplate;
+
     @BeforeEach
     void setUp() {
-        RedisTemplate templateMock = Mockito.mock(RedisTemplate.class);
+        redisTemplate = mock(RedisTemplate.class);
 
-        when(templateMock.opsForHash()).thenReturn(hashOperations);
+        // faz casting explícito para evitar erro com Generics
+        when(redisTemplate.opsForHash()).thenReturn((HashOperations) hashOperations);
 
-        this.redisTrackingService = new RedisTrackingService(templateMock);
+        this.redisTrackingService = new RedisTrackingService(redisTemplate);
     }
 
     @Mock
@@ -69,15 +79,65 @@ class RedisTrackingServiceTest {
         verify(hashOperations, never()).putAll(any(), any());
     }
 
+    @DisplayName("It should return the current position and timestamp from the front-end")
     @Test
-    void getLiveLocation() {
+    void getLiveLocationWithSuccess() {
+        redisTrackingService.getLiveLocation(travelId);
+
+        verify(hashOperations).entries(
+                eq(expectedRedisKey)
+        );
     }
 
+    @DisplayName("It throw exception when key is null")
     @Test
-    void storeTravelMetadata() {
+    void shouldThrowExceptionWhenKeyIsNull() {
+        assertThrows(RuntimeException.class, () -> {
+            redisTrackingService.getLiveLocation(null);
+                });
+
+        verify(hashOperations, never()).entries(any());
     }
 
+    @DisplayName("It should update the ETA and the status must be used individually by the HSET")
     @Test
-    void deleteTrackingData() {
+    void shouldStoreTravelMetadataSuccessfully() {
+        String eta = "300s";
+        String distance = "5.2km";
+        String status = "IN_TRANSIT";
+
+        redisTrackingService.storeTravelMetadata(travelId, eta, distance, status);
+
+        verify(hashOperations).put(eq(expectedRedisKey), eq("eta"), eq(eta));
+        verify(hashOperations).put(eq(expectedRedisKey), eq("distance"), eq(distance));
+        verify(hashOperations).put(eq(expectedRedisKey), eq("status"), eq(status));
+    }
+
+    @DisplayName("Should throw exception and not call Redis if travelId is NULL")
+    @Test
+    void shouldThrowExceptionWhenInstoreTravelMetadataKeyIsNull() {
+        assertThrows(RuntimeException.class, () -> {
+            redisTrackingService.storeTravelMetadata(null, null, null, null);
+        });
+
+        verify(hashOperations, never()).put(any(), any(), any());
+    }
+
+    @DisplayName("Should remove all Redis data with successfully")
+    @Test
+    void deleteTrackingDataWithSuccess() {
+        redisTrackingService.deleteTrackingData(travelId);
+
+        verify(redisTemplate).delete(eq(expectedRedisKey));
+    }
+
+    @DisplayName("Should throw exception when travelId is NULL")
+    @Test
+    void shouldThrowExceptionWhenTravelIdOfDeleteTrackingDataIsNull() {
+        assertThrows(RuntimeException.class, () -> {
+            redisTrackingService.deleteTrackingData(null);
+        });
+
+        verify(redisTemplate, never()).delete(eq(expectedRedisKey));
     }
 }
