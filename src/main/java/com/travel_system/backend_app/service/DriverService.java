@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,33 +31,37 @@ public class DriverService {
 
     public List<DriverResponseDTO> getAllDrivers() {
         List<UserModel> allDrivers = repository.findAll();
-        if (allDrivers.isEmpty()) throw new RuntimeException("motoristas não encontrados");
+        if (allDrivers.isEmpty()) {
+            return Collections.emptyList();
+        }
         return allDrivers.stream().filter(driver -> driver instanceof Driver)
                 .map(driver -> driverConverted((Driver) driver))
                 .toList();
     }
 
     public List<DriverResponseDTO> getAllActiveDrivers() {
-        return getDriversByStatus(GeneralStatus.ACTIVE, "Sem motoristas ativos");
+        return getDriversByStatus(GeneralStatus.ACTIVE);
     }
 
     public List<DriverResponseDTO> getAllInactiveDrivers() {
-        return getDriversByStatus(GeneralStatus.INACTIVE, "Sem motoristas inativos");
+        return getDriversByStatus(GeneralStatus.INACTIVE);
     }
 
     @Transactional
     public DriverResponseDTO createDriver(DriverRequestDTO driverRequestDTO) {
         Driver newDriver = driverMapper(driverRequestDTO);
 
-        // cryptography the password
-        String rawPassword = newDriver.getPassword();
-        newDriver.setPassword(passwordEncoder.encode(rawPassword));
+        verifyFieldsIsNull(driverRequestDTO);
 
         Optional<UserModel> email = repository.findByEmail(newDriver.getEmail());
         Optional<UserModel> telephone = repository.findByTelephone(newDriver.getTelephone());
 
         if (email.isPresent()) throw new RuntimeException("Email já existe");
         if (telephone.isPresent()) throw new RuntimeException("Telefone já existe");
+
+        // cryptography the password
+        String rawPassword = newDriver.getPassword();
+        newDriver.setPassword(passwordEncoder.encode(rawPassword));
 
         Driver savedDriver = repository.save(newDriver);
         return driverConverted(savedDriver);
@@ -112,9 +117,17 @@ public class DriverService {
         }
     }
 
-    private List<DriverResponseDTO> getDriversByStatus(GeneralStatus status, String exceptionMessage) {
+
+
+    // METODOS AUXILIARES
+    // METODOS AUXILIARES
+    // METODOS AUXILIARES
+
+    private List<DriverResponseDTO> getDriversByStatus(GeneralStatus status) {
         List<UserModel> drivers = repository.findAllByStatus(status);
-        if (drivers.isEmpty()) throw new NoStudentsOrDriversFoundException(exceptionMessage);
+        if (drivers.isEmpty()) {
+            return Collections.emptyList();
+        }
         return drivers.stream().filter(driver -> driver instanceof Driver)
                 .map(driver -> driverConverted((Driver) driver))
                 .toList();
@@ -132,6 +145,13 @@ public class DriverService {
         newDriver.setAreaOfActivity(requestDTO.areaOfActivity());
 
         return newDriver;
+    }
+
+    private void verifyFieldsIsNull(DriverRequestDTO dto) {
+        if (dto.email() == null || dto.password() == null ||
+                dto.name() == null || dto.telephone() == null || dto.areaOfActivity() == null) {
+            throw new RuntimeException("Você deve preencher todos os campos requeridos");
+        }
     }
 
     private DriverResponseDTO driverConverted(Driver driver) {

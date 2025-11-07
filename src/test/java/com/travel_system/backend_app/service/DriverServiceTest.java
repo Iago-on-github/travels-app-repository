@@ -5,6 +5,7 @@ import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.DriverRequestDTO;
 import com.travel_system.backend_app.model.dtos.DriverResponseDTO;
+import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.repository.UserModelRepository;
 import org.hibernate.query.Page;
@@ -18,6 +19,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import javax.management.RuntimeErrorException;
 import java.time.LocalDateTime;
 import java.util.*;
 
@@ -38,7 +40,7 @@ class DriverServiceTest {
 
     - Sempre usar @DisplayName para dar uma breve descrição do que aquele teste deve fazer
 
-    - Em cenários de Success, os métodos devem conter "With Success" em seus respectivos nomes.
+    - Em cenários de Success, os métodos devem conter "With Success" ou "Successfully" em seus respectivos nomes.
 
     - Em cenários de Error, os métodos devem conter "ShouldThrowExceptionWhen..." em seus respectivos nomes.
 
@@ -99,41 +101,235 @@ class DriverServiceTest {
             verify(repository).findAll();
         }
 
-        @DisplayName("Deve checar se o findAll esta executando, mas não está retornando " +
-                "registros de Drivers. Não deve lançar exceção")
+        @DisplayName("Deve retornar uma lista vazia caso não haja registros no banco")
         @Test
-        void shouldCheckIfFindAllExecutedButDidNotBringRecords() {
-            // ACT PARA UMA LISTA SEM REGISTRO DE MOTORISTAS
-            List<UserModel> mixedListWithoutDrivers = new ArrayList<>();
-            mixedListWithoutDrivers.add(null);
-            mixedListWithoutDrivers.add(null);
-            mixedListWithoutDrivers.add(null);
-
-            doReturn(mixedListWithoutDrivers).when(repository).findAll();
-
-            List<DriverResponseDTO> result = driverService.getAllDrivers();
-
-            assertEquals(0, result.size(), "The filter not should be return any driver ");
-
-            verify(repository).findAll();
-        }
-
-        @DisplayName("Deve lançar execeção se o repositório não retornar absolutamente nada")
-        @Test
-        void shouldThrowExceptionWhenFindAllIsEmpty() {
+        void shouldReturnAnEmptyListWithSuccess() {
             // ACT CONFIGURADO PARA RETORNAR LISTA VAZIA
             doReturn(Collections.emptyList()).when(repository).findAll();
 
-            RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-                driverService.getAllDrivers();
-            });
+            List<DriverResponseDTO> result = driverService.getAllDrivers();
 
-            assertEquals("motoristas não encontrados", thrown.getMessage(),
-                    "A execução deve conter a mensagem esperada");
+            assertEquals(0, result.size());
 
             verify(repository).findAll();
         }
     }
+
+    @Nested
+    class getAllActiveDrivers {
+
+        @DisplayName("Deve retornar todos os motoristas ATIVOS com sucesso")
+        @Test
+        void getAllActiveDriversSuccessfully() {
+            List<UserModel> activeDriversList = new ArrayList<>();
+            activeDriversList.add(driver1);
+            activeDriversList.add(student);
+            activeDriversList.add(driver2);
+
+            doReturn(activeDriversList).when(repository).findAllByStatus(GeneralStatus.ACTIVE);
+
+            List<DriverResponseDTO> result = driverService.getAllActiveDrivers();
+
+            DriverResponseDTO expectedDto1 = createdExpectedDTO(driver1);
+            DriverResponseDTO expectedDto2 = createdExpectedDTO(driver2);
+
+            assertEquals(2, result.size());
+
+            assertEquals(expectedDto1.name(), result.getFirst().name());
+            assertEquals(expectedDto2.name(), result.get(1).name());
+
+            verify(repository).findAllByStatus(GeneralStatus.ACTIVE);
+        }
+
+        @DisplayName("Deve retornar uma lista vazia caso não haja registros no banco")
+        @Test
+        void shouldReturnAnEmptyListWithSuccess() {
+            // "ACT" PARA RETORNAR LISTA VAZIA
+            doReturn(Collections.emptyList()).when(repository).findAllByStatus(GeneralStatus.ACTIVE);
+
+            List<DriverResponseDTO> result = driverService.getAllActiveDrivers();
+
+            assertEquals(0, result.size());
+
+            verify(repository).findAllByStatus(GeneralStatus.ACTIVE);
+        }
+    }
+
+    @Nested
+    class getAllInactiveDrivers {
+
+        @DisplayName("Deve retornar todos os motoristas com sucesso")
+        @Test
+        void getAllInactiveDriversSuccessfully() {
+            List<UserModel> allInactiveDrivers = new ArrayList<>();
+            allInactiveDrivers.add(driver1);
+            allInactiveDrivers.add(student);
+            allInactiveDrivers.add(driver2);
+
+            doReturn(allInactiveDrivers).when(repository).findAllByStatus(GeneralStatus.INACTIVE);
+
+            List<DriverResponseDTO> result = driverService.getAllInactiveDrivers();
+
+            DriverResponseDTO expectedDriver1 = createdExpectedDTO(driver1);
+            DriverResponseDTO expectedDriver2 = createdExpectedDTO(driver2);
+
+            assertEquals(expectedDriver1.name(), result.getFirst().name());
+            assertEquals(expectedDriver2.name(), result.get(1).name());
+
+            verify(repository).findAllByStatus(GeneralStatus.INACTIVE);
+        }
+
+        @DisplayName("Deve retornar uma lista vazia caso não haja registros no banco")
+        @Test
+        void shouldReturnAnEmptyListWithSuccess() {
+            // "ACT" PARA RETORNAR LISTA VAZIA
+            doReturn(Collections.emptyList()).when(repository).findAllByStatus(GeneralStatus.INACTIVE);
+
+            List<DriverResponseDTO> result = driverService.getAllInactiveDrivers();
+
+            assertEquals(0, result.size());
+
+            verify(repository).findAllByStatus(GeneralStatus.INACTIVE);
+        }
+    }
+
+    @Nested
+    class createDriver {
+        @DisplayName("Deve criar um motorista com sucesso")
+        @Test
+        void shouldCreateDriverWithSuccess() {
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "akjssd323",
+                    "Iago",
+                    null,
+                    "75987435984",
+                    null,
+                    "city"
+            );
+
+            doReturn(Optional.empty()).when(repository).findByEmail(anyString());
+            doReturn(Optional.empty()).when(repository).findByTelephone(anyString());
+
+            doReturn("encoded_password_123").when(passwordEncoder).encode("akjssd323");
+
+            doAnswer(invocation -> {
+                Driver savedDriver = invocation.getArgument(0);
+                assertEquals("encoded_password_123", savedDriver.getPassword());
+                savedDriver.setId(UUID.randomUUID());
+                return savedDriver;
+            }).when(repository).save(any(Driver.class));
+
+            DriverResponseDTO result = driverService.createDriver(dto);
+
+            assertNotNull(result);
+            assertNotNull(result.id(), "ID should be not null");
+            assertEquals("Iago@gmail.com", result.email());
+            assertEquals("Iago", result.name());
+            assertEquals("75987435984", result.telephone());
+            assertEquals("city", result.areaOfActivity());
+
+            verify(repository).findByEmail(dto.email());
+            verify(repository).findByTelephone(dto.telephone());
+
+            verify(passwordEncoder).encode("akjssd323");
+
+            verify(repository).save(any(Driver.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando alguns campos são null")
+        @Test
+        void throwExceptionWhenFieldsIsNull() {
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    null,
+                    null,
+                    "firstName",
+                    "lastName",
+                    null,
+                    "pictureExemple",
+                    null
+            );
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.createDriver(dto);
+            });
+
+            verify(repository, never()).findByEmail(anyString());
+            verify(repository, never()).findByTelephone(anyString());
+            verify(passwordEncoder, never()).encode(anyString());
+            verify(repository, never()).save(any(Driver.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o email já existir no banco")
+        @Test
+        void throwExceptionWhenEmailAlreadyExists() {
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "teste",
+                    "firstName",
+                    "lastName",
+                    "null",
+                    "pictureExemple",
+                    "null"
+            );
+
+            UserModel existingUser = new Driver();
+
+            doReturn(Optional.of(existingUser)).when(repository).findByEmail(dto.email());
+            doReturn(Optional.empty()).when(repository).findByTelephone(dto.telephone());
+
+            RuntimeException throwns = assertThrows(RuntimeException.class, () -> {
+                driverService.createDriver(dto);
+            });
+
+            assertEquals("Email já existe", throwns.getMessage());
+
+            verify(repository).findByEmail(dto.email());
+            verify(repository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o telefone já existir no banco de dados")
+        @Test
+        void throwExceptionWhenTelephoneAlreadyExists() {
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "teste",
+                    "firstName",
+                    "lastName",
+                    "12809182",
+                    "pictureExemple",
+                    "null"
+            );
+
+            UserModel existingUser = new Driver();
+
+            doReturn(Optional.empty()).when(repository).findByEmail(dto.email());
+            doReturn(Optional.of(existingUser)).when(repository).findByTelephone(dto.telephone());
+
+            RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
+                driverService.createDriver(dto);
+            });
+
+            assertEquals("Telefone já existe", thrown.getMessage());
+
+            verify(repository).findByTelephone(dto.telephone());
+            verify(repository, never()).save(any());
+        }
+    }
+
+    @Nested
+    class updateLoggedDriver {
+        @DisplayName("Deve atualizar os campos de um motorista logado com sucesso")
+        @Test
+        void shouldUpdateLoggedDriverWithSuccess() {
+
+        }
+    }
+
+
+
+
+
 
     // [========= MÉTODOS AUXILIARES =========]
     // [========= MÉTODOS AUXILIARES =========]
