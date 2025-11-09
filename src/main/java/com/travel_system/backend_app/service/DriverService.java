@@ -113,7 +113,7 @@ public class DriverService {
             driverRequest.setStatus(GeneralStatus.INACTIVE);
             repository.save(driverRequest);
         } else {
-            throw new IllegalArgumentException("Usuário não é um estudante, " + id);
+            throw new IllegalArgumentException("Usuário não é um motorista, " + id);
         }
     }
 

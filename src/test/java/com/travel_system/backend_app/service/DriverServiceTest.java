@@ -6,27 +6,20 @@ import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.DriverRequestDTO;
 import com.travel_system.backend_app.model.dtos.DriverResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.repository.UserModelRepository;
-import org.hibernate.query.Page;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
-import org.mockito.Spy;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import javax.management.RuntimeErrorException;
 import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.*;
-import static reactor.core.publisher.Mono.when;
 
 @ExtendWith(MockitoExtension.class)
 class DriverServiceTest {
@@ -250,9 +243,7 @@ class DriverServiceTest {
                     null
             );
 
-            assertThrows(RuntimeException.class, () -> {
-                driverService.createDriver(dto);
-            });
+            assertThrows(RuntimeException.class, () -> driverService.createDriver(dto));
 
             verify(repository, never()).findByEmail(anyString());
             verify(repository, never()).findByTelephone(anyString());
@@ -278,9 +269,7 @@ class DriverServiceTest {
             doReturn(Optional.of(existingUser)).when(repository).findByEmail(dto.email());
             doReturn(Optional.empty()).when(repository).findByTelephone(dto.telephone());
 
-            RuntimeException throwns = assertThrows(RuntimeException.class, () -> {
-                driverService.createDriver(dto);
-            });
+            RuntimeException throwns = assertThrows(RuntimeException.class, () -> driverService.createDriver(dto));
 
             assertEquals("Email já existe", throwns.getMessage());
 
@@ -306,9 +295,7 @@ class DriverServiceTest {
             doReturn(Optional.empty()).when(repository).findByEmail(dto.email());
             doReturn(Optional.of(existingUser)).when(repository).findByTelephone(dto.telephone());
 
-            RuntimeException thrown = assertThrows(RuntimeException.class, () -> {
-                driverService.createDriver(dto);
-            });
+            RuntimeException thrown = assertThrows(RuntimeException.class, () -> driverService.createDriver(dto));
 
             assertEquals("Telefone já existe", thrown.getMessage());
 
@@ -322,13 +309,194 @@ class DriverServiceTest {
         @DisplayName("Deve atualizar os campos de um motorista logado com sucesso")
         @Test
         void shouldUpdateLoggedDriverWithSuccess() {
+            driver1.setStatus(GeneralStatus.ACTIVE);
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "akjssd323",
+                    "Iago",
+                    null,
+                    "75987435984",
+                    null,
+                    "city"
+            );
 
+            when(repository.findByEmail(anyString())).thenReturn(Optional.of(driver1));
+            when(repository.findByEmailOrTelephoneAndIdNot(anyString(), anyString(), any(UUID.class)))
+                    .thenReturn(Optional.empty());
+
+            doAnswer(invocation -> {
+                driver1 = invocation.getArgument(0);
+                return driver1;
+            }).when(repository).save(any(Driver.class));
+
+            DriverResponseDTO result = driverService.updateLoggedDriver(driver1.getEmail(), dto);
+
+            verify(repository, times(1)).save(driver1);
+
+            assertEquals(dto.email(), result.email());
+            assertEquals(dto.name(), result.name());
+            assertEquals(dto.telephone(), result.telephone());
+            assertEquals(dto.areaOfActivity(), result.areaOfActivity());
+        }
+
+        @DisplayName("Deve lançar exceção quando email já estiver em uso por outro usuário")
+        @Test
+        void throwExceptionWhenEmailAlreadyExists() {
+            driver1.setStatus(GeneralStatus.ACTIVE);
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "akjssd323",
+                    "Iago",
+                    null,
+                    "75987435984",
+                    null,
+                    "city"
+            );
+
+            when(repository.findByEmail(anyString())).thenThrow(RuntimeException.class);
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.updateLoggedDriver(dto.email(), dto);
+            });
+
+            verify(repository).findByEmail(dto.email());
+            verify(repository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o Status for INACTIVE")
+        @Test
+        void throwExceptionWhenIsInactiveUser() {
+            driver1.setStatus(GeneralStatus.INACTIVE);
+
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "akjssd323",
+                    "Iago",
+                    null,
+                    "75987435984",
+                    null,
+                    "city"
+            );
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.updateLoggedDriver(dto.email(), dto);
+            });
+
+            verify(repository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando email ou telefone já estiverem em ouso por outro user")
+        @Test
+        void throwExceptionWhenEmailOrTelephoneAlreadyExists() {
+            driver1.setStatus(GeneralStatus.ACTIVE);
+            DriverRequestDTO dto = new DriverRequestDTO(
+                    "Iago@gmail.com",
+                    "akjssd323",
+                    "Iago",
+                    null,
+                    "75987435984",
+                    null,
+                    "city"
+            );
+
+            when(repository.findByEmail(dto.email())).thenReturn(Optional.of(driver1));
+            when(repository.findByEmailOrTelephoneAndIdNot(dto.email(), dto.telephone(), driver1.getId()))
+                    .thenReturn(Optional.of(driver1));
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.updateLoggedDriver(dto.email(), dto);
+            });
+
+            verify(repository, never()).save(any());
         }
     }
 
+    @Nested
+    class getLoggedInDriverProfile {
 
+        @DisplayName("Deve retornar o usuário logado com sucesso")
+        @Test
+        void shouldGetLoggedInDriverProfile() {
+            when(repository.findByEmailOrTelephone(driver1.getEmail(), driver1.getTelephone()))
+                    .thenReturn(Optional.of(driver1));
 
+            DriverResponseDTO result = driverService.getLoggedInDriverProfile(driver1.getEmail(), driver1.getTelephone());
 
+            assertEquals(driver1.getEmail(), result.email());
+            assertEquals(driver1.getTelephone(), result.telephone());
+            assertNotNull(result);
+        }
+
+        @DisplayName("Deve lançar exceção quando motorista logado não for encontrado")
+        @Test
+        void throwExceptionWhenLoggedDriverIsNotWanted() {
+            when(repository.findByEmailOrTelephone(anyString(), anyString()))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(RuntimeException.class,  () -> {
+                driverService.getLoggedInDriverProfile(driver1.getEmail(), driver1.getTelephone());
+            });
+        }
+    }
+
+    @Nested
+    class disableDriver {
+
+        @DisplayName("Deve desativar um motorista com sucesso")
+        @Test
+        void shouldDisableDriverWithSuccess() {
+            driver1.setStatus(GeneralStatus.ACTIVE);
+
+            when(repository.findById(driver1.getId())).thenReturn(Optional.of(driver1));
+
+            driverService.disableDriver(driver1.getId());
+
+            verify(repository).save(any(Driver.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o motorista já estiver desativado")
+        @Test
+        void throwExceptionWhenDriverAlreadyInactive() {
+            driver1.setStatus(GeneralStatus.INACTIVE);
+
+            when(repository.findById(driver1.getId())).thenReturn(Optional.of(driver1));
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.disableDriver(driver1.getId());
+            });
+
+            verify(repository, never()).save(any(Driver.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o id não é do motorista")
+        @Test
+        void throwExceptionWhenIsInvalidId() {
+            driver1.setStatus(GeneralStatus.ACTIVE);
+
+            when(repository.findById(any(UUID.class))).thenReturn(Optional.empty());
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.disableDriver(UUID.randomUUID());
+            });
+
+            verify(repository, never()).save(any(Driver.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o id do motorista não for encontrado")
+        @Test
+        void throwExceptionWhenNotWantedDriver() {
+            driver1.setStatus(GeneralStatus.ACTIVE);
+
+            when(repository.findById(driver1.getId())).thenReturn(Optional.empty());
+
+            assertThrows(RuntimeException.class, () -> {
+                driverService.disableDriver(driver1.getId());
+            });
+
+            verify(repository, never()).save(any(Driver.class));
+        }
+
+    }
 
 
     // [========= MÉTODOS AUXILIARES =========]
