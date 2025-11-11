@@ -6,5 +6,5 @@ import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 public interface MapboxAPICalling {
     // define os contratos de chamadas da api
 
-    RouteDetailsDTO calculateRoute(double originLat, double originLong, double destLat, double destLong);
+    RouteDetailsDTO calculateRoute(Double originLong, Double originLat, Double destLong, Double destLat);
 }

@@ -2,6 +2,7 @@ package com.travel_system.backend_app.service;
 
 import com.mapbox.geojson.Point;
 import com.mapbox.geojson.utils.PolylineUtils;
+import com.travel_system.backend_app.customExceptions.NoSuchCoordinates;
 import com.travel_system.backend_app.interfaces.MapboxAPICalling;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.MapboxApiResponse;
@@ -24,17 +25,29 @@ public class MapboxAPIService implements MapboxAPICalling {
 
     private WebClient webClient;
     private TravelRepository travelRepository;
+    private PolylineService polylineService;
 
-    @Autowired
-    public MapboxAPIService(TravelRepository travelRepository, WebClient webClient) {
+    public MapboxAPIService(PolylineService polylineService, TravelRepository travelRepository, WebClient webClient) {
+        this.polylineService = polylineService;
         this.travelRepository = travelRepository;
         this.webClient = webClient;
     }
 
+    @Autowired
+
+
     // chamada bruta da api
     @Override
-    public RouteDetailsDTO calculateRoute(double originLong, double originLat, double destLong, double destLat) {
+    public RouteDetailsDTO calculateRoute(Double originLong, Double originLat, Double destLong, Double destLat) {
         String waypoints = originLong + "," + originLat + ";" + destLong + "," + destLat;
+
+        if (originLong == null || originLat == null || destLong == null || destLat == null) {
+            throw new NoSuchCoordinates("Coordenadas não encontradas, "
+                    + "originLong: " + originLong
+                    + "originLong: " + originLat
+                    + "destLong: " + destLong
+                    + "destLat:" + destLat);
+        }
 
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder
@@ -50,12 +63,19 @@ public class MapboxAPIService implements MapboxAPICalling {
     }
 
     // verifica se a rota foi desviada do padrão
-    public RouteDeviationDTO isRouteDeviation(double currentLat, double currentLong, String polylineRoute) {
+    public RouteDeviationDTO isRouteDeviation(Double currentLat, Double currentLong, String polylineRoute) {
         double minDistance = Double.MAX_VALUE;
         double projLng = 0;
         double projLat = 0;
 
-        List<Point> decodePolyline = FormattedPolyline(polylineRoute);
+        if (currentLat == null || currentLong == null || polylineRoute == null) {
+            throw new NoSuchCoordinates("Coordenadas atuais não encontradas, "
+                    + "currentLat: " + currentLat
+                    + "currentLong: " + currentLong
+                    + "polylineRoute: " + polylineRoute);
+        }
+
+        List<Point> decodePolyline = polylineService.FormattedPolyline(polylineRoute);
         Point driverCurrentLoc = Point.fromLngLat(currentLong, currentLat);
 
         if (decodePolyline.size() < 2) {
@@ -122,10 +142,6 @@ public class MapboxAPIService implements MapboxAPICalling {
     }
 
     // padroniza a decodificação do polyline
-    private List<Point> FormattedPolyline(String polylineRoute) {
-        int precision = 5;
-        return PolylineUtils.decode(polylineRoute, precision);
-    }
 
     private Travel travelMapper(RouteDetailsDTO routeDetailsDTO) {
         Travel travelEntity = new Travel();
@@ -145,8 +161,8 @@ public class MapboxAPIService implements MapboxAPICalling {
         RoutesDTO routesDto = mapboxApiResponse.routes().getFirst();
 
         return new RouteDetailsDTO(
-                Math.round(routesDto.distance()),
-                Math.round(routesDto.duration()),
+                (double) Math.round(routesDto.duration()),
+                (double) Math.round(routesDto.distance()),
                 routesDto.geometry()
         );
     }

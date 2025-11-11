@@ -27,8 +27,8 @@ public class Travel {
 
     // rota (estáticos)
     private String polylineRoute;
-    private Long duration;
-    private Long distance;
+    private Double duration;
+    private Double distance;
 
     // coordenadas
     private Double originLatitude;
@@ -41,7 +41,7 @@ public class Travel {
     public Travel() {
     }
 
-    public Travel(UUID id, TravelStatus travelStatus, Driver driver, Set<StudentTravel> studentTravels, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Long duration, Long distance, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude) {
+    public Travel(UUID id, TravelStatus travelStatus, Driver driver, Set<StudentTravel> studentTravels, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Double duration, Double distance, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude) {
         this.id = id;
         this.travelStatus = travelStatus;
         this.driver = driver;
@@ -113,19 +113,19 @@ public class Travel {
         this.polylineRoute = polylineRoute;
     }
 
-    public Long getDuration() {
+    public Double getDuration() {
         return duration;
     }
 
-    public void setDuration(Long duration) {
+    public void setDuration(Double duration) {
         this.duration = duration;
     }
 
-    public Long getDistance() {
+    public Double getDistance() {
         return distance;
     }
 
-    public void setDistance(Long distance) {
+    public void setDistance(Double distance) {
         this.distance = distance;
     }
 

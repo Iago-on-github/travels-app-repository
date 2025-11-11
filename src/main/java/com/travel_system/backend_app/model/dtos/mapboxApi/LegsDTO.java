@@ -2,7 +2,7 @@ package com.travel_system.backend_app.model.dtos.mapboxApi;
 
 import java.util.List;
 
-record LegsDTO(
+public record LegsDTO(
         List<Object> via_waypoints,
         List<AdminDTO> admins,
         Double weight,
