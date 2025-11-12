@@ -27,14 +27,12 @@ public class MapboxAPIService implements MapboxAPICalling {
     private TravelRepository travelRepository;
     private PolylineService polylineService;
 
+    @Autowired
     public MapboxAPIService(PolylineService polylineService, TravelRepository travelRepository, WebClient webClient) {
         this.polylineService = polylineService;
         this.travelRepository = travelRepository;
         this.webClient = webClient;
     }
-
-    @Autowired
-
 
     // chamada bruta da api
     @Override
@@ -75,7 +73,7 @@ public class MapboxAPIService implements MapboxAPICalling {
                     + "polylineRoute: " + polylineRoute);
         }
 
-        List<Point> decodePolyline = polylineService.FormattedPolyline(polylineRoute);
+        List<Point> decodePolyline = polylineService.formattedPolyline(polylineRoute);
         Point driverCurrentLoc = Point.fromLngLat(currentLong, currentLat);
 
         if (decodePolyline.size() < 2) {
@@ -123,26 +121,25 @@ public class MapboxAPIService implements MapboxAPICalling {
     }
 
     // retorna distância/tempo restante com base na localização atual
-    public RouteDetailsDTO recalculateETA(double currentLng, double currentLat, double finalLong, double finalLat) {
+    public RouteDetailsDTO recalculateETA(Double currentLng, Double currentLat, Double finalLong, Double finalLat) {
         RouteDetailsDTO routeDetails = calculateRoute(currentLng, currentLat, finalLong, finalLat);
 
-        if (routeDetails == null) throw new RuntimeException("Sem dados de rota");
+        if (routeDetails == null) throw new NoSuchCoordinates("Sem dados de rota");
 
         return routeDetails;
     }
 
     // salva os dados de distance, duration e polyline na entidade Travel
     @Transactional
-    public void getRouteDetailsDTO(double originLong, double originLat, double destLong, double destLat) {
+    public void getRouteDetailsDTO(Double originLong, Double originLat, Double destLong, Double destLat) {
         RouteDetailsDTO staticRouteDetails = calculateRoute(originLong, originLat, destLong, destLat);
 
-        if (staticRouteDetails == null) throw new RuntimeException("Dados de rota estão nulos");
+        if (staticRouteDetails == null) throw new NoSuchCoordinates("Dados de rota estão nulos");
 
         travelRepository.save(travelMapper(staticRouteDetails));
     }
 
     // padroniza a decodificação do polyline
-
     private Travel travelMapper(RouteDetailsDTO routeDetailsDTO) {
         Travel travelEntity = new Travel();
 
@@ -155,7 +152,7 @@ public class MapboxAPIService implements MapboxAPICalling {
 
     private RouteDetailsDTO RouteDetailsMapper(MapboxApiResponse mapboxApiResponse) {
         if (mapboxApiResponse.routes().isEmpty()) {
-            throw new RuntimeException("Routes is empty.");
+            throw new NoSuchCoordinates("Routes is empty.");
         }
 
         RoutesDTO routesDto = mapboxApiResponse.routes().getFirst();

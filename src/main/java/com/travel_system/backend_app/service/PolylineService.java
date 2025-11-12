@@ -9,7 +9,7 @@ import java.util.List;
 @Service
 public class PolylineService {
 
-    public List<Point> FormattedPolyline(String polylineRoute) {
+    public List<Point> formattedPolyline(String polylineRoute) {
         int precision = 5;
         return PolylineUtils.decode(polylineRoute, precision);
     }
