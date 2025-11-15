@@ -1,6 +1,6 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.customExceptions.TravelException;
+import com.travel_system.backend_app.exceptions.TravelException;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;

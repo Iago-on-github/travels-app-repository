@@ -1,6 +1,8 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.customExceptions.NoStudentsOrDriversFoundException;
+import com.travel_system.backend_app.exceptions.DuplicateResourceException;
+import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
+import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.UserModelRepository;
@@ -8,7 +10,6 @@ import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
 import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
-import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
@@ -16,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -26,35 +28,37 @@ public class StudentService {
     private StudentTravelRepository studentTravelRepository;
     private PasswordEncoder passwordEncoder;
 
+    @Autowired
     public StudentService(UserModelRepository repository, StudentTravelRepository studentTravelRepository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.studentTravelRepository = studentTravelRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-    @Autowired
-
-
     // na tabela 'userModel', chama apenas instancias de Student
     public List<StudentResponseDTO> getAllStudents() {
         List<UserModel> getAllStudents = repository.findAll();
-        if (getAllStudents.isEmpty()) throw new NoStudentsOrDriversFoundException("Estudantes não encontrados.");
+
+        if (getAllStudents.isEmpty()) return Collections.emptyList();
+
         return getAllStudents.stream()
                 .filter(student -> student instanceof Student)
                 .map(user -> studentConverted((Student) user)).toList();
     }
 
     public List<StudentResponseDTO> getAllActiveStudents() {
-        return getStudentsByStatus(GeneralStatus.ACTIVE, "sem estudantes ativos.");
+        return getStudentsByStatus(GeneralStatus.ACTIVE);
     }
 
     public List<StudentResponseDTO> getAllInactiveStudents() {
-        return getStudentsByStatus(GeneralStatus.INACTIVE, "sem estudantes inativos.");
+        return getStudentsByStatus(GeneralStatus.INACTIVE);
     }
 
     @Transactional
     public StudentResponseDTO createStudent(StudentRequestDTO requestDTO) {
         Student newStudent = studentMapper(requestDTO);
+
+        verifyFieldsIsNull(requestDTO);
 
         // cryptography the password
         String rawPassword = newStudent.getPassword();
@@ -64,8 +68,8 @@ public class StudentService {
         Optional<UserModel> email = repository.findByEmail(newStudent.getEmail());
         Optional<UserModel> telephone = repository.findByTelephone(newStudent.getTelephone());
 
-        if (email.isPresent()) throw new RuntimeException("Email já existe");
-        if (telephone.isPresent()) throw new RuntimeException("Telefone já existe");
+        if (email.isPresent()) throw new DuplicateResourceException("O email" + ", " + requestDTO.email() + ", " + "já existe");
+        if (telephone.isPresent()) throw new DuplicateResourceException("O telefone" + ", " + requestDTO.telephone() + ", " + "já existe");
 
         Student savedStudent = repository.save(newStudent);
         return studentConverted(savedStudent);
@@ -74,10 +78,10 @@ public class StudentService {
     @Transactional
     public StudentResponseDTO updateLoggedStudent(String authenticatedUserEmail, StudentRequestDTO requestDTO) {
         Student existingStudent = (Student) repository.findByEmail(authenticatedUserEmail)
-                .orElseThrow(() -> new RuntimeException("Estudante não encontrado, " + authenticatedUserEmail));
+                .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + authenticatedUserEmail));
 
         if (existingStudent.getStatus().equals(GeneralStatus.INACTIVE)) {
-          throw new RuntimeException("Não é possível modificar dados de uma conta inativa.");
+          throw new InactiveAccountModificationException("Não é possível modificar dados de uma conta inativa.");
         }
 
         // verifica se email/tel/id ja existe no banco
@@ -86,7 +90,7 @@ public class StudentService {
                 requestDTO.telephone(),
                 existingStudent.getId()
         );
-        if (existingUser.isPresent()) throw new RuntimeException("Email ou telefone já em uso por outro usuário.");
+        if (existingUser.isPresent()) throw new DuplicateResourceException("Email ou telefone já em uso por outro usuário.");
 
         existingStudent.setEmail(requestDTO.email());
         existingStudent.setPassword(requestDTO.password());
@@ -124,9 +128,27 @@ public class StudentService {
         }
     }
 
-    private List<StudentResponseDTO> getStudentsByStatus(GeneralStatus status, String exceptionMessage) {
+    // haverá um popup no front que perguntará se o estudante irá participar da viagem
+    public void confirmEmbarkOnTravel(UUID studentId, UUID travelId) {
+        StudentTravel studentTravel = studentTravelRepository
+                .findByStudentIdAndTravelId(studentId, travelId)
+                .orElseThrow(() -> new RuntimeException("Associação travel e student não encontrada"));
+
+        if (studentTravel.isEmbark()) {
+            throw new RuntimeException("embarque já confirmado");
+        }
+
+        studentTravel.setEmbark(true);
+        studentTravelRepository.save(studentTravel);
+    }
+
+    // MÉTODOS AUXILIARES
+    // MÉTODOS AUXILIARES
+    // MÉTODOS AUXILIARES
+
+    private List<StudentResponseDTO> getStudentsByStatus(GeneralStatus status) {
         List<UserModel> students = repository.findAllByStatus(status);
-        if (students.isEmpty()) throw new NoStudentsOrDriversFoundException(exceptionMessage);
+        if (students.isEmpty()) Collections.emptyList();
         return students.stream().filter(student -> student instanceof Student)
                 .map(student -> studentConverted((Student) student))
                 .toList();
@@ -161,17 +183,11 @@ public class StudentService {
         );
     }
 
-    // haverá um popup no front que perguntará se o estudante irá participar da viagem
-    public void confirmEmbarkOnTravel(UUID studentId, UUID travelId) {
-        StudentTravel studentTravel = studentTravelRepository
-                .findByStudentIdAndTravelId(studentId, travelId)
-                .orElseThrow(() -> new RuntimeException("Associação travel e student não encontrada"));
-
-        if (studentTravel.isEmbark()) {
-            throw new RuntimeException("embarque já confirmado");
+    private void verifyFieldsIsNull(StudentRequestDTO dto) {
+        if (dto.email() == null || dto.password() == null ||
+                dto.name() == null || dto.telephone() == null || dto.institutionType() == null || dto.course() == null) {
+            throw new EmptyMandatoryFieldsFound("Você deve preencher todos os campos requeridos");
         }
-
-        studentTravel.setEmbark(true);
-        studentTravelRepository.save(studentTravel);
     }
+
 }

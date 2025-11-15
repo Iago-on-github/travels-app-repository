@@ -1,6 +1,5 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.customExceptions.NoStudentsOrDriversFoundException;
 import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.DriverRequestDTO;

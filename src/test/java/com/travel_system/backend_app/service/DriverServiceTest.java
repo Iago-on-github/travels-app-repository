@@ -129,7 +129,7 @@ class DriverServiceTest {
             assertEquals(2, result.size());
 
             assertEquals(expectedDto1.name(), result.getFirst().name());
-            assertEquals(expectedDto2.name(), result.get(1).name());
+            assertEquals(expectedDto2.name(), result.getLast().name());
 
             verify(repository).findAllByStatus(GeneralStatus.ACTIVE);
         }

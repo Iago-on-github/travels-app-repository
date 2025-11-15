@@ -1,8 +1,7 @@
 package com.travel_system.backend_app.service;
 
 import com.mapbox.geojson.Point;
-import com.mapbox.geojson.utils.PolylineUtils;
-import com.travel_system.backend_app.customExceptions.NoSuchCoordinates;
+import com.travel_system.backend_app.exceptions.NoSuchCoordinates;
 import com.travel_system.backend_app.interfaces.MapboxAPICalling;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.MapboxApiResponse;
