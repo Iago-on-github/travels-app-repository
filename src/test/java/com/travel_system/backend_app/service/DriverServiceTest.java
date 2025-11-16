@@ -414,7 +414,7 @@ class DriverServiceTest {
     @Nested
     class getLoggedInDriverProfile {
 
-        @DisplayName("Deve retornar o usuário logado com sucesso")
+        @DisplayName("Deve retornar o motorista logado com sucesso")
         @Test
         void shouldGetLoggedInDriverProfile() {
             when(repository.findByEmailOrTelephone(driver1.getEmail(), driver1.getTelephone()))

@@ -1,16 +1,14 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.DuplicateResourceException;
-import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
-import com.travel_system.backend_app.model.Driver;
-import com.travel_system.backend_app.model.Student;
-import com.travel_system.backend_app.model.UserModel;
+import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
 import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.InstitutionType;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.UserModelRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -68,14 +66,17 @@ class StudentServiceTest {
             GeneralStatus.ACTIVE
     );
 
-    private Driver driver;
+    private Driver driver = new Driver();
+    private Travel travel = new Travel();
+    private StudentTravel studentTravel = new StudentTravel();
     private Student student1;
     private Student student2;
 
     @BeforeEach
     void setUp() {
         student1 = createNewStudentForTesting(UUID.randomUUID(), "Student1", "Teste", "Student1@gmail.com", "24367824", LocalDateTime.now(), InstitutionType.UNIVERSITY, "CC", GeneralStatus.ACTIVE);
-        student2= createNewStudentForTesting(UUID.randomUUID(), "Student2", "Teste", "Student2@gmail.com", "24546435", LocalDateTime.now(), InstitutionType.EXTENSION_COURSE, "Medicine", GeneralStatus.ACTIVE);
+        student2 = createNewStudentForTesting(UUID.randomUUID(), "Student2", "Teste", "Student2@gmail.com", "24546435", LocalDateTime.now(), InstitutionType.EXTENSION_COURSE, "Medicine", GeneralStatus.ACTIVE);
+
     }
 
     @Nested
@@ -331,7 +332,250 @@ class StudentServiceTest {
     @Nested
     class updateLoggedStudent {
 
+        @DisplayName("Deve atualizar um estudante logado com sucesso")
+        @Test
+        void shouldUpdateLoggedStudentWithSuccess() {
+            student1.setStatus(GeneralStatus.ACTIVE);
+            StudentRequestDTO requestDto = new StudentRequestDTO(
+                    "teste@gmail.com",
+                    "exemple_encoded_pass",
+                    "teste01",
+                    "last_name_teste",
+                    "8642876424",
+                    "profile_picture_example",
+                    InstitutionType.UNIVERSITY,
+                    "example_course"
+            );
+
+            when(userModelRepository.findByEmail(anyString())).thenReturn(Optional.of(student1));
+            when(userModelRepository.findByEmailOrTelephoneAndIdNot(anyString(), anyString(), any(UUID.class))).thenReturn(Optional.empty());
+
+            doAnswer(invocation -> {
+                student1 = invocation.getArgument(0);
+                return student1;
+            }).when(userModelRepository).save(any(Student.class));
+
+            StudentResponseDTO result = studentService.updateLoggedStudent(student1.getEmail(), requestDto);
+
+            verify(userModelRepository, times(1)).save(any(Student.class));
+
+            assertEquals(requestDto.email(), result.email());
+            assertEquals(requestDto.name(), result.name());
+            assertEquals(requestDto.telephone(), result.telephone());
+        }
+
+        @DisplayName("Deve lançar exceção quando o email já estiver em uso por outro usuário")
+        @Test
+        void throwExceptionWhenEmailAlreadyUsed() {
+            StudentRequestDTO requestDto = new StudentRequestDTO(
+                    "teste@gmail.com",
+                    "exemple_encoded_pass",
+                    "teste01",
+                    "last_name_teste",
+                    "8642876424",
+                    "profile_picture_example",
+                    InstitutionType.UNIVERSITY,
+                    "example_course"
+            );
+
+            when(userModelRepository.findByEmail(anyString())).thenThrow(EntityNotFoundException.class);
+
+            assertThrows(EntityNotFoundException.class, () -> {
+                studentService.updateLoggedStudent(requestDto.email(), requestDto);
+            });
+
+            verify(userModelRepository).findByEmail(anyString());
+            verify(userModelRepository, never()).save(any(Student.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante for inativo")
+        @Test
+        void throwExceptionWhenIsInactiveUser() {
+            student1.setStatus(GeneralStatus.INACTIVE);
+
+            StudentRequestDTO requestDto = new StudentRequestDTO(
+                    "teste@gmail.com",
+                    "exemple_encoded_pass",
+                    "teste01",
+                    "last_name_teste",
+                    "8642876424",
+                    "profile_picture_example",
+                    InstitutionType.UNIVERSITY,
+                    "example_course"
+            );
+
+            when(userModelRepository.findByEmail(anyString())).thenThrow(InactiveAccountModificationException.class);
+
+            assertThrows(InactiveAccountModificationException.class, () -> {
+                studentService.updateLoggedStudent(requestDto.email(), requestDto);
+            });
+
+            verify(userModelRepository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando email ou telefone já estiver em uso por outro usuário")
+        @Test
+        void throwExceptionWhenEmailOrTelephoneAlreadyUsed() {
+            StudentRequestDTO requestDto = new StudentRequestDTO(
+                    "teste@gmail.com",
+                    "exemple_encoded_pass",
+                    "teste01",
+                    "last_name_teste",
+                    "8642876424",
+                    "profile_picture_example",
+                    InstitutionType.UNIVERSITY,
+                    "example_course"
+            );
+
+            when(userModelRepository.findByEmail(anyString())).thenReturn(Optional.of(student1));
+            when(userModelRepository.findByEmailOrTelephoneAndIdNot(anyString(), anyString(), any(UUID.class))).thenReturn(Optional.of(student1));
+
+            assertThrows(DuplicateResourceException.class, () ->{
+                studentService.updateLoggedStudent(requestDto.email(), requestDto);
+            });
+
+            verify(userModelRepository).findByEmailOrTelephoneAndIdNot(anyString(), anyString(), any(UUID.class));
+            verify(userModelRepository).findByEmail(anyString());
+
+            verify(userModelRepository, never()).save(any());
+        }
     }
+
+    @Nested
+    class getLoggedInStudentProfile {
+
+        @DisplayName("Deve retornar um estudante logado com sucesso")
+        @Test
+        void shouldGetLoggedInStudentProfileWithSuccess() {
+            when(userModelRepository.findByEmailOrTelephone(student1.getEmail(), student1.getTelephone())).thenReturn(Optional.of(student1));
+
+            StudentResponseDTO result = studentService.getLoggedInStudentProfile(student1.getEmail(), student1.getTelephone());
+
+            assertNotNull(result);
+
+            assertEquals(student1.getEmail(), result.email());
+            assertEquals(student1.getTelephone(), result.telephone());
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante logado não for encontrado")
+        @Test
+        void throwExceptionWhenLoggedStudentIsNotWanted() {
+            when(userModelRepository.findByEmailOrTelephone(student1.getEmail(), student1.getTelephone()))
+                    .thenReturn(Optional.empty());
+
+            EntityNotFoundException error = assertThrows(EntityNotFoundException.class, () -> {
+                studentService.getLoggedInStudentProfile(student1.getEmail(), student1.getTelephone());
+            });
+
+            assertEquals("Estudante não encontrato", error.getMessage());
+
+        }
+    }
+
+    @Nested
+    class disableStudent {
+
+        @DisplayName("Deve desativar um estudante com sucesso")
+        @Test
+        void shouldDisableStudentWithSuccess() {
+            when(userModelRepository.findById(student1.getId())).thenReturn(Optional.of(student1));
+
+            studentService.disableStudent(student1.getId());
+
+            verify(userModelRepository).save(any(Student.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante não for encontrado")
+        @Test
+        void throwExceptionWhenStudentNotFound() {
+            when(userModelRepository.findById(any(UUID.class))).thenReturn(Optional.empty());
+
+            assertThrows(EntityNotFoundException.class, () -> {
+                studentService.disableStudent(student1.getId());
+            });
+
+            verify(userModelRepository, never()).save(any(Student.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante já estiver desativado")
+        @Test
+        void throwExceptionWhenStudentAlreadyInactive() {
+            student1.setStatus(GeneralStatus.INACTIVE);
+
+            when(userModelRepository.findById(student1.getId())).thenReturn(Optional.of(student1));
+
+            assertThrows(IllegalStateException.class, () -> {
+                studentService.disableStudent(student1.getId());
+            });
+
+            verify(userModelRepository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o id não for de um estudante")
+        @Test
+        void throwExceptionWhenUserNotIsStudent() {
+            UUID id = UUID.randomUUID();
+
+            driver.setId(id);
+            driver.setStatus(GeneralStatus.ACTIVE);
+
+            when(userModelRepository.findById(id)).thenReturn(Optional.of(driver));
+
+            assertThrows(IllegalArgumentException.class, () -> {
+                studentService.disableStudent(id);
+            });
+
+            verify(userModelRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    class confirmEmbarkOnTravel {
+
+        @DisplayName("Deve confirmar o embarque o estudante com sucesso")
+        @Test
+        void shouldConfirmEmbarkOnTravelWithSuccess() {
+            studentTravel.setEmbark(false);
+
+            when(studentTravelRepository.findByStudentIdAndTravelId(student1.getId(), travel.getId()))
+                    .thenReturn(Optional.of(studentTravel));
+
+            studentService.confirmEmbarkOnTravel(student1.getId(), travel.getId());
+
+            verify(studentTravelRepository).save(any(StudentTravel.class));
+        }
+
+        @DisplayName("Deve lançar exceção quando não haver relacionamento travel > estudante")
+        @Test
+        void throwExceptionWhenTravelStudentAssociationNotFound() {
+            studentTravel.setEmbark(false);
+
+            when(studentTravelRepository.findByStudentIdAndTravelId(student1.getId(), driver.getId()))
+                    .thenReturn(Optional.empty());
+
+            assertThrows(TravelStudentAssociationNotFoundException.class, () -> {
+                studentService.confirmEmbarkOnTravel(student1.getId(), travel.getId());
+            });
+
+            verify(studentTravelRepository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante já havia confirmado embarque")
+        @Test
+        void throwExceptionWhenEmbarkAlreadyConfirmed() {
+            studentTravel.setEmbark(true);
+
+            when(studentTravelRepository.findByStudentIdAndTravelId(student1.getId(), travel.getId()))
+                    .thenThrow(BoardingAlreadyConfirmedException.class);
+
+            assertThrows(BoardingAlreadyConfirmedException.class, () -> {
+                studentService.confirmEmbarkOnTravel(student1.getId(), travel.getId());
+            });
+
+            verify(studentTravelRepository, never()).save(any());
+        }
+    }
+
 
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES

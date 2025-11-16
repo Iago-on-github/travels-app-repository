@@ -1,8 +1,6 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.DuplicateResourceException;
-import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
-import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
+import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.UserModelRepository;
@@ -107,7 +105,7 @@ public class StudentService {
 
     public StudentResponseDTO getLoggedInStudentProfile(String email, String telephone) {
         Student student = (Student) repository.findByEmailOrTelephone(email, telephone)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrato."));
+                .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrato"));
 
         return studentConverted(student);
     }
@@ -115,7 +113,7 @@ public class StudentService {
     @Transactional
     public void disableStudent(UUID id) {
         Optional<UserModel> student = repository.findById(id);
-        UserModel userModel = student.orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado, " + id));
+        UserModel userModel = student.orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + id));
 
         if (userModel instanceof Student studentRequest) {
             if (studentRequest.getStatus().equals(GeneralStatus.INACTIVE)) {
@@ -132,10 +130,10 @@ public class StudentService {
     public void confirmEmbarkOnTravel(UUID studentId, UUID travelId) {
         StudentTravel studentTravel = studentTravelRepository
                 .findByStudentIdAndTravelId(studentId, travelId)
-                .orElseThrow(() -> new RuntimeException("Associação travel e student não encontrada"));
+                .orElseThrow(() -> new TravelStudentAssociationNotFoundException("Associação travel e student não encontrada"));
 
         if (studentTravel.isEmbark()) {
-            throw new RuntimeException("embarque já confirmado");
+            throw new BoardingAlreadyConfirmedException("Embarque já confirmado");
         }
 
         studentTravel.setEmbark(true);
