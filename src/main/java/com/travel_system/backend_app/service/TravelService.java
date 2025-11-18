@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.TravelException;
+import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
@@ -37,7 +38,7 @@ public class TravelService {
     @Transactional
     public void startTravel(UUID travelId) {
         Travel actualTrip = travelRepository.findById(travelId)
-                .orElseThrow(() -> new RuntimeException("Trip not found: " + travelId));
+                .orElseThrow(() -> new TripNotFound("Trip not found: " + travelId));
 
         if (actualTrip.getTravelStatus() == TravelStatus.FINISH) {
             throwTravelException("Não é possível iniciar uma viagem já finalizada.");
@@ -66,10 +67,10 @@ public class TravelService {
     @Transactional
     public void endTravel(UUID travelId) {
         Travel actualTrip = travelRepository.findById(travelId)
-                .orElseThrow(() -> new RuntimeException("Trip not found, " + travelId));
+                .orElseThrow(() -> new TripNotFound("Trip not found: " + travelId));
 
         if (!(actualTrip.getTravelStatus() == TravelStatus.TRAVELLING)) {
-            throwTravelException("A viagem nao esta em andamento, " + travelId);
+            throwTravelException("A viagem nao esta em andamento: " + travelId);
         }
 
         actualTrip.setTravelStatus(TravelStatus.FINISH);
@@ -124,6 +125,10 @@ public class TravelService {
 
         deactivateStudentLink(trip, studentId);
     }
+
+    // MÉTODOS AUXILIARES
+    // MÉTODOS AUXILIARES
+    // MÉTODOS AUXILIARES
 
     private void persistStudentLink(Travel actualTrip, UUID studentId) {
         StudentTravel studentTravel = new StudentTravel();
