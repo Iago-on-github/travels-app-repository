@@ -1,6 +1,8 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.exceptions.StudentAlreadyLinkedToTrip;
 import com.travel_system.backend_app.exceptions.TravelException;
+import com.travel_system.backend_app.exceptions.TravelStudentAssociationNotFoundException;
 import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.StudentTravel;
@@ -102,7 +104,7 @@ public class TravelService {
                 .anyMatch(student -> student.getStudent().getId().equals(studentId));
 
         if (studentTravel) {
-            throwTravelException("Estudante já vinculado à viagem:" + studentId);
+            throw new StudentAlreadyLinkedToTrip("Estudante já vinculado à viagem:" + studentId);
         }
 
         persistStudentLink(trip, studentId);
@@ -114,14 +116,14 @@ public class TravelService {
         Travel trip = travelRepository.getReferenceById(travelId);
 
         if (!(trip.getTravelStatus() == TravelStatus.TRAVELLING)) {
-            throwTravelException("Viagem não está em andamento.");
+            throw new TravelException("Viagem não está em andamento.");
         }
 
         boolean studentTravel = trip.getStudentTravels().stream()
                 .filter(StudentTravel::isEmbark)
                 .anyMatch(student -> student.getStudent().getId().equals(studentId));
 
-        if (!studentTravel) { throwTravelException("Estudante não está ATIVO na viagem."); }
+        if (!studentTravel) throw new TravelStudentAssociationNotFoundException("Estudante não está ATIVO na viagem.");
 
         deactivateStudentLink(trip, studentId);
     }
@@ -145,7 +147,7 @@ public class TravelService {
 
     private void deactivateStudentLink(Travel actualTrip, UUID studentId) {
         StudentTravel studentTravel = studentTravelRepository.findByTravelIdAndStudentId(actualTrip.getId(), studentId)
-                .orElseThrow(() -> new RuntimeException("Vínculo aluno-viagem não encontrado."));
+                .orElseThrow(() -> new TravelStudentAssociationNotFoundException("Vínculo aluno-viagem não encontrado."));
 
         studentTravel.setEmbark(false);
         studentTravel.setDisembarkHour(Instant.now());

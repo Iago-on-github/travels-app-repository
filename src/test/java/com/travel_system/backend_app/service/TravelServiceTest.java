@@ -1,11 +1,14 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.exceptions.StudentAlreadyLinkedToTrip;
 import com.travel_system.backend_app.exceptions.TravelException;
+import com.travel_system.backend_app.exceptions.TravelStudentAssociationNotFoundException;
 import com.travel_system.backend_app.exceptions.TripNotFound;
-import com.travel_system.backend_app.model.Driver;
-import com.travel_system.backend_app.model.StudentTravel;
-import com.travel_system.backend_app.model.Travel;
+import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
+import com.travel_system.backend_app.model.enums.GeneralStatus;
+import com.travel_system.backend_app.model.enums.InstitutionType;
+import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
@@ -21,6 +24,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -65,19 +69,21 @@ class TravelServiceTest {
     private Travel travel;
     private RouteDetailsDTO routeDetailsDTO;
     private StudentTravel studentTravel;
+    private Student student;
+    private UserModel userModel;
 
     private ArgumentCaptor<Travel> travelArgumentCaptor = ArgumentCaptor.forClass(Travel.class);
     private ArgumentCaptor<StudentTravel> studentTravelArgumentCaptor = ArgumentCaptor.forClass(StudentTravel.class);
 
     @BeforeEach
     void setUp() {
-        studentTravel = new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), Instant.now().plusMillis(2000000));
+        student = new Student("student@gmail.com", "student_password", "student", "student_last", "283647823", null, InstitutionType.UNIVERSITY, "any_course", GeneralStatus.ACTIVE, Role.ROLE_USER);
 
         travel = createTravelEntity(
                 UUID.randomUUID(),
                 TravelStatus.PENDING,
                 null,
-                Set.of(studentTravel),
+                Collections.emptySet(),
                 Instant.now(),
                 Instant.now().plusMillis(1000000),
                 "encoded_route_simulada_xyz123",
@@ -88,6 +94,8 @@ class TravelServiceTest {
                 -22.9068,
                 -43.1729
         );
+
+        studentTravel = new StudentTravel(UUID.randomUUID(), travel, student, true, Instant.now(), Instant.now().plusMillis(2000000));
 
         routeDetailsDTO = new RouteDetailsDTO(1293.3, 16633.2, "encoded_geometry_simulate");
     }
@@ -179,6 +187,7 @@ class TravelServiceTest {
         @DisplayName("Deve encerrar uma viagem com sucesso")
         @Test
         void shouldEndTravelWithSuccess() {
+            travel.setStudentTravels(Set.of(studentTravel));
             travel.setTravelStatus(TravelStatus.TRAVELLING);
 
             when(travelRepository.findById(travel.getId())).thenReturn(Optional.of(travel));
@@ -186,13 +195,15 @@ class TravelServiceTest {
             travelService.endTravel(travel.getId());
 
             verify(studentTravelRepository).save(studentTravelArgumentCaptor.capture());
+            StudentTravel studentTravelCapture = studentTravelArgumentCaptor.getValue();
+
             verify(travelRepository).save(travelArgumentCaptor.capture());
 
             assertNotNull(travelArgumentCaptor.getValue().getEndHourTravel());
 
             assertEquals(TravelStatus.FINISH, travelArgumentCaptor.getValue().getTravelStatus());
-            assertEquals(studentTravel.isEmbark(), studentTravelArgumentCaptor.getValue().isEmbark());
-            assertNotNull(studentTravelArgumentCaptor.getValue().getDisembarkHour());
+            assertEquals(studentTravel.isEmbark(), studentTravelCapture.isEmbark());
+            assertNotNull(studentTravelCapture.getDisembarkHour());
 
             verify(redisTrackingService).deleteTrackingData(String.valueOf(travel.getId()));
         }
@@ -231,8 +242,144 @@ class TravelServiceTest {
     }
 
     @Nested
-    class joinTravel {}
+    class joinTravel {
 
+        @DisplayName("Deve começar uma viagem com sucesso")
+        @Test
+        void shouldJoinTravelWithSuccess() {
+            student.setId(UUID.randomUUID());
+
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+            when(userModelRepository.getReferenceById(student.getId())).thenReturn(student);
+
+            travelService.joinTravel(travel.getId(), student.getId());
+
+            verify(studentTravelRepository).save(studentTravelArgumentCaptor.capture());
+            StudentTravel studentCapture = studentTravelArgumentCaptor.getValue();
+
+            assertEquals(travel, studentCapture.getTravel());
+            assertEquals(student, studentCapture.getStudent());
+
+            assertTrue(studentCapture.isEmbark());
+
+            assertNotNull(studentCapture.getEmbarkHour());
+        }
+
+        @DisplayName("Deve lançar exceção quando a viagem não estiver em andamento")
+        @Test
+        void throwExceptionWhenTripNotTravelling() {
+            travel.setTravelStatus(TravelStatus.FINISH);
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+
+            TravelException expectedErrorMsg = assertThrows(TravelException.class, () -> {
+                travelService.joinTravel(travel.getId(), student.getId());
+            });
+
+            assertEquals("Viagem não está em andamento.", expectedErrorMsg.getMessage());
+
+            verify(travelRepository, never()).save(any());
+            verify(studentTravelRepository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante já estiver vinculado à viagem")
+        @Test
+        void throwExceptionWhenStudentLinkedToTrip(){
+            student.setId(UUID.randomUUID());
+            studentTravel.setStudent(student);
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+            travel.setStudentTravels(Set.of(studentTravel));
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+
+            StudentAlreadyLinkedToTrip expectedErrorMsg = assertThrows(StudentAlreadyLinkedToTrip.class, () -> {
+                travelService.joinTravel(travel.getId(), student.getId());
+            });
+
+            assertEquals("Estudante já vinculado à viagem:" + student.getId(), expectedErrorMsg.getMessage());
+
+            verify(travelRepository, never()).save(any());
+            verify(studentTravelRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    class leaveTravel {
+
+        @DisplayName("Deve registrar o desembarque removendo o estudante de uma viagem")
+        @Test
+        void shouldLeaveTravelWithSuccess() {
+            travel.setStudentTravels(Set.of(studentTravel));
+            student.setId(UUID.randomUUID());
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+            when(studentTravelRepository.findByTravelIdAndStudentId(travel.getId(), student.getId())).thenReturn(Optional.of(studentTravel));
+
+            travelService.leaveTravel(travel.getId(), student.getId());
+
+            verify(studentTravelRepository).save(studentTravelArgumentCaptor.capture());
+            StudentTravel studentTravelCapture = studentTravelArgumentCaptor.getValue();
+
+            assertEquals(studentTravel.isEmbark(), studentTravelCapture.isEmbark());
+            assertEquals(studentTravel.getEmbarkHour(), studentTravelCapture.getEmbarkHour());
+        }
+
+        @DisplayName("Deve lançar exceção quando a viagem não estiver em andamento")
+        @Test
+        void throwExceptionWhenTripNotTravelling() {
+            student.setId(UUID.randomUUID());
+            travel.setTravelStatus(TravelStatus.PENDING);
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+
+            TravelException expectedErrorMsg = assertThrows(TravelException.class, () -> {
+                travelService.leaveTravel(travel.getId(), student.getId());
+            });
+
+            assertEquals("Viagem não está em andamento.", expectedErrorMsg.getMessage());
+
+            verify(studentTravelRepository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o estudante não estiver vinculado à viagem")
+        @Test
+        void throwExceptionWhenStudentNotLinkedToTrip() {
+            student.setId(UUID.randomUUID());
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+
+            TravelStudentAssociationNotFoundException expectedErrorMsg = assertThrows(TravelStudentAssociationNotFoundException.class, () -> {
+                travelService.leaveTravel(travel.getId(), student.getId());
+            });
+
+            assertEquals("Estudante não está ATIVO na viagem.", expectedErrorMsg.getMessage());
+
+            verify(studentTravelRepository, never()).save(any());
+        }
+
+        @DisplayName("Deve lançar exceção quando o vínculo estudante-viagem não for encontrado")
+        @Test
+        void throwExceptionWhenStudentTravelBondNotFound() {
+            travel.setStudentTravels(Set.of(studentTravel));
+            student.setId(UUID.randomUUID());
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
+            when(studentTravelRepository.findByTravelIdAndStudentId(travel.getId(), student.getId())).thenReturn(Optional.empty());
+
+            TravelStudentAssociationNotFoundException expectedErrorMsg = assertThrows(TravelStudentAssociationNotFoundException.class, () -> {
+                travelService.leaveTravel(travel.getId(), student.getId());
+            });
+
+            assertEquals("Vínculo aluno-viagem não encontrado.", expectedErrorMsg.getMessage());
+
+            verify(studentTravelRepository, never()).save(any());
+        }
+    }
 
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
