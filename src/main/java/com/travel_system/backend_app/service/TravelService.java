@@ -1,14 +1,13 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.StudentAlreadyLinkedToTrip;
-import com.travel_system.backend_app.exceptions.TravelException;
-import com.travel_system.backend_app.exceptions.TravelStudentAssociationNotFoundException;
-import com.travel_system.backend_app.exceptions.TripNotFound;
+import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.UserModel;
+import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
+import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDeviationDTO;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
@@ -18,6 +17,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
