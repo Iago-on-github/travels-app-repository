@@ -17,15 +17,18 @@ import java.util.UUID;
 
 @Service
 public class TravelTrackingService {
+
     private TravelRepository travelRepository;
     private RedisTrackingService redisTrackingService;
     private MapboxAPIService mapboxAPIService;
+    private RouteCalculationService routeCalculationService;
 
     @Autowired
-    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService) {
+    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService) {
         this.travelRepository = travelRepository;
         this.redisTrackingService = redisTrackingService;
         this.mapboxAPIService = mapboxAPIService;
+        this.routeCalculationService = routeCalculationService;
     }
 
     // Orquestra o sistema de tracking em tempo real, verificando desvios de rota,
@@ -38,7 +41,7 @@ public class TravelTrackingService {
             throw new TravelException("A viagem não está em andamento");
         }
 
-        RouteDeviationDTO routeDeviation = mapboxAPIService.isRouteDeviation(currentLat, currentLng, travel.getPolylineRoute());
+        RouteDeviationDTO routeDeviation = routeCalculationService.isRouteDeviation(currentLat, currentLng, travel.getPolylineRoute());
 
         RouteDetailsDTO newEtaRecalculateByApi;
         PreviousStateDTO previousEta;
