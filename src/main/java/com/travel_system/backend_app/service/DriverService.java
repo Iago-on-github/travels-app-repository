@@ -1,11 +1,13 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.exceptions.DuplicateResourceException;
+import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
+import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
 import com.travel_system.backend_app.model.Driver;
-import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.DriverRequestDTO;
 import com.travel_system.backend_app.model.dtos.DriverResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.repository.UserModelRepository;
+import com.travel_system.backend_app.repository.DriverRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,23 +21,23 @@ import java.util.UUID;
 
 @Service
 public class DriverService {
-    private UserModelRepository repository;
+    private DriverRepository repository;
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    public DriverService(UserModelRepository repository, PasswordEncoder passwordEncoder) {
+    public DriverService(DriverRepository repository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
     }
 
     public List<DriverResponseDTO> getAllDrivers() {
-        List<UserModel> allDrivers = repository.findAll();
+        List<Driver> allDrivers = repository.findAll();
+
         if (allDrivers.isEmpty()) {
             return Collections.emptyList();
         }
-        return allDrivers.stream().filter(driver -> driver instanceof Driver)
-                .map(driver -> driverConverted((Driver) driver))
-                .toList();
+
+        return allDrivers.stream().map(this::driverConverted).toList();
     }
 
     public List<DriverResponseDTO> getAllActiveDrivers() {
@@ -52,8 +54,8 @@ public class DriverService {
 
         verifyFieldsIsNull(driverRequestDTO);
 
-        Optional<UserModel> email = repository.findByEmail(newDriver.getEmail());
-        Optional<UserModel> telephone = repository.findByTelephone(newDriver.getTelephone());
+        Optional<Driver> email = repository.findByEmail(newDriver.getEmail());
+        Optional<Driver> telephone = repository.findByTelephone(newDriver.getTelephone());
 
         if (email.isPresent()) throw new RuntimeException("Email já existe");
         if (telephone.isPresent()) throw new RuntimeException("Telefone já existe");
@@ -68,19 +70,19 @@ public class DriverService {
 
     @Transactional
     public DriverResponseDTO updateLoggedDriver(String authenticatedEmail, DriverRequestDTO driverRequestDTO) {
-        Driver driverLogged = (Driver) repository.findByEmail(authenticatedEmail)
-                .orElseThrow(() -> new RuntimeException("Motorista não encontrado, " + authenticatedEmail));
+        Driver driverLogged = repository.findByEmail(authenticatedEmail)
+                .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado, " + authenticatedEmail));
 
         if (driverLogged.getStatus().equals(GeneralStatus.INACTIVE)) {
-            throw new RuntimeException("Não é possível modificar dados de uma conta inativa");
+            throw new InactiveAccountModificationException("Não é possível modificar dados de uma conta inativa");
         }
 
-        Optional<UserModel> existingUser = repository.findByEmailOrTelephoneAndIdNot(
+        Optional<Driver> existingUser = repository.findByEmailOrTelephoneAndIdNot(
                 driverRequestDTO.email(),
                 driverRequestDTO.telephone(),
                 driverLogged.getId()
         );
-        if (existingUser.isPresent()) throw new RuntimeException("Email ou telefone já em uso por outro usuário.");
+        if (existingUser.isPresent()) throw new DuplicateResourceException("Email ou telefone já em uso por outro usuário.");
 
         driverLogged.setEmail(driverRequestDTO.email());
         driverLogged.setPassword(driverRequestDTO.password());
@@ -95,41 +97,37 @@ public class DriverService {
     }
 
     public DriverResponseDTO getLoggedInDriverProfile(String email, String telephone) {
-        Driver getDriverLoggedProfile = (Driver) repository.findByEmailOrTelephone(email, telephone)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado. Email, telephone: " + email + ", " + telephone));
+        Driver getDriverLoggedProfile = repository.findByEmailOrTelephone(email, telephone)
+                .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado. Email, telephone: " + email + ", " + telephone));
         return driverConverted(getDriverLoggedProfile);
     }
 
     @Transactional
     public void disableDriver(UUID id) {
-        Optional<UserModel> driver = repository.findById(id);
-        UserModel userModel = driver.orElseThrow(() -> new EntityNotFoundException("Usuário não encontrado, " + id));
+        Driver driver = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado, " + id));
 
-        if (userModel instanceof Driver driverRequest) {
-            if (driverRequest.getStatus().equals(GeneralStatus.INACTIVE)) {
-                throw new IllegalStateException("Driver já desativado, " + id);
-            }
-            driverRequest.setStatus(GeneralStatus.INACTIVE);
-            repository.save(driverRequest);
-        } else {
-            throw new IllegalArgumentException("Usuário não é um motorista, " + id);
+        if (driver.getStatus().equals(GeneralStatus.INACTIVE)) {
+            throw new IllegalStateException("Driver já desativado, " + id);
         }
+
+        driver.setStatus(GeneralStatus.INACTIVE);
+
+        repository.save(driver);
     }
-
-
 
     // METODOS AUXILIARES
     // METODOS AUXILIARES
     // METODOS AUXILIARES
 
     private List<DriverResponseDTO> getDriversByStatus(GeneralStatus status) {
-        List<UserModel> drivers = repository.findAllByStatus(status);
+        List<Driver> drivers = repository.findAllByStatus(status);
+
         if (drivers.isEmpty()) {
             return Collections.emptyList();
         }
-        return drivers.stream().filter(driver -> driver instanceof Driver)
-                .map(driver -> driverConverted((Driver) driver))
-                .toList();
+
+        return drivers.stream().map(driver -> driverConverted((Driver) driver)).toList();
     }
 
     private Driver driverMapper(DriverRequestDTO requestDTO) {
@@ -149,7 +147,7 @@ public class DriverService {
     private void verifyFieldsIsNull(DriverRequestDTO dto) {
         if (dto.email() == null || dto.password() == null ||
                 dto.name() == null || dto.telephone() == null || dto.areaOfActivity() == null) {
-            throw new RuntimeException("Você deve preencher todos os campos requeridos");
+            throw new EmptyMandatoryFieldsFound("Você deve preencher todos os campos requeridos");
         }
     }
 

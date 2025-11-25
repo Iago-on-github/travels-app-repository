@@ -10,11 +10,8 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 import java.util.UUID;
 
-@Entity
-@Table(name = "user_model")
-@Inheritance(strategy = InheritanceType.SINGLE_TABLE)
-@DiscriminatorColumn(name = "user_type", discriminatorType = DiscriminatorType.STRING)
 @EntityListeners(AuditingEntityListener.class)
+@MappedSuperclass
 public abstract class UserModel {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)

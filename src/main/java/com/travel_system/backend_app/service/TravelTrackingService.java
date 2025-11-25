@@ -12,6 +12,7 @@ import com.travel_system.backend_app.repository.TravelRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -23,12 +24,16 @@ public class TravelTrackingService {
     private MapboxAPIService mapboxAPIService;
     private RouteCalculationService routeCalculationService;
 
+    // usar no lugar de Instant.now() para ajudar nos testes unitários
+    private Clock clock;
+
     @Autowired
-    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService) {
+    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, Clock clock) {
         this.travelRepository = travelRepository;
         this.redisTrackingService = redisTrackingService;
         this.mapboxAPIService = mapboxAPIService;
         this.routeCalculationService = routeCalculationService;
+        this.clock = clock;
     }
 
     // Orquestra o sistema de tracking em tempo real, verificando desvios de rota,
@@ -64,7 +69,7 @@ public class TravelTrackingService {
             } else {
                 previousEta = redisTrackingService.getPreviousEta(travel.getId().toString());
 
-                long currentTimeMillis = Instant.now().toEpochMilli();
+                long currentTimeMillis = clock.millis();
                 long timeElapsedMillis = currentTimeMillis - previousEta.timeStamp();
                 double timeElapsedSeconds = (double) timeElapsedMillis / 1000.0;
 
@@ -77,8 +82,8 @@ public class TravelTrackingService {
                 currentDistance = travel.getDistance();
                 currentPolyline = travel.getPolylineRoute();
             }
-        } catch (RecalculateEtaException e) {
-            throw new RecalculateEtaException(e.getMessage());
+        } catch (Exception e) {
+            throw new RecalculateEtaException(e.getMessage(), e.getCause());
         }
 
         redisTrackingService.storeLiveLocation(

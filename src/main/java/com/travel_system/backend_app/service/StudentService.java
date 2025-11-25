@@ -2,8 +2,8 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.StudentTravel;
+import com.travel_system.backend_app.repository.StudentRepository;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
-import com.travel_system.backend_app.repository.UserModelRepository;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
@@ -22,26 +22,23 @@ import java.util.UUID;
 
 @Service
 public class StudentService {
-    private UserModelRepository repository;
+    private StudentRepository repository;
     private StudentTravelRepository studentTravelRepository;
     private PasswordEncoder passwordEncoder;
 
     @Autowired
-    public StudentService(UserModelRepository repository, StudentTravelRepository studentTravelRepository, PasswordEncoder passwordEncoder) {
+    public StudentService(StudentRepository repository, StudentTravelRepository studentTravelRepository, PasswordEncoder passwordEncoder) {
         this.repository = repository;
         this.studentTravelRepository = studentTravelRepository;
         this.passwordEncoder = passwordEncoder;
     }
 
-    // na tabela 'userModel', chama apenas instancias de Student
     public List<StudentResponseDTO> getAllStudents() {
-        List<UserModel> getAllStudents = repository.findAll();
+        List<Student> getAllStudents = repository.findAll();
 
         if (getAllStudents.isEmpty()) return Collections.emptyList();
 
-        return getAllStudents.stream()
-                .filter(student -> student instanceof Student)
-                .map(user -> studentConverted((Student) user)).toList();
+        return getAllStudents.stream().map(this::studentConverted).toList();
     }
 
     public List<StudentResponseDTO> getAllActiveStudents() {
@@ -63,8 +60,8 @@ public class StudentService {
         String encodedPassword = passwordEncoder.encode(rawPassword);
         newStudent.setPassword(encodedPassword);
 
-        Optional<UserModel> email = repository.findByEmail(newStudent.getEmail());
-        Optional<UserModel> telephone = repository.findByTelephone(newStudent.getTelephone());
+        Optional<Student> email = repository.findByEmail(newStudent.getEmail());
+        Optional<Student> telephone = repository.findByTelephone(newStudent.getTelephone());
 
         if (email.isPresent()) throw new DuplicateResourceException("O email" + ", " + requestDTO.email() + ", " + "já existe");
         if (telephone.isPresent()) throw new DuplicateResourceException("O telefone" + ", " + requestDTO.telephone() + ", " + "já existe");
@@ -75,7 +72,7 @@ public class StudentService {
 
     @Transactional
     public StudentResponseDTO updateLoggedStudent(String authenticatedUserEmail, StudentRequestDTO requestDTO) {
-        Student existingStudent = (Student) repository.findByEmail(authenticatedUserEmail)
+        Student existingStudent = repository.findByEmail(authenticatedUserEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + authenticatedUserEmail));
 
         if (existingStudent.getStatus().equals(GeneralStatus.INACTIVE)) {
@@ -83,11 +80,12 @@ public class StudentService {
         }
 
         // verifica se email/tel/id ja existe no banco
-        Optional<UserModel> existingUser = repository.findByEmailOrTelephoneAndIdNot(
+        Optional<Student> existingUser = repository.findByEmailOrTelephoneAndIdNot(
                 requestDTO.email(),
                 requestDTO.telephone(),
                 existingStudent.getId()
         );
+
         if (existingUser.isPresent()) throw new DuplicateResourceException("Email ou telefone já em uso por outro usuário.");
 
         existingStudent.setEmail(requestDTO.email());
@@ -104,7 +102,7 @@ public class StudentService {
     }
 
     public StudentResponseDTO getLoggedInStudentProfile(String email, String telephone) {
-        Student student = (Student) repository.findByEmailOrTelephone(email, telephone)
+        Student student = repository.findByEmailOrTelephone(email, telephone)
                 .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrato"));
 
         return studentConverted(student);
@@ -112,18 +110,16 @@ public class StudentService {
 
     @Transactional
     public void disableStudent(UUID id) {
-        Optional<UserModel> student = repository.findById(id);
-        UserModel userModel = student.orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + id));
+        Student student = repository.findById(id)
+                .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + id));
 
-        if (userModel instanceof Student studentRequest) {
-            if (studentRequest.getStatus().equals(GeneralStatus.INACTIVE)) {
-                throw new IllegalStateException("Estudante já desativado, " + id);
-            }
-            studentRequest.setStatus(GeneralStatus.INACTIVE);
-            repository.save(studentRequest);
-        } else {
-            throw new IllegalArgumentException("Usuário não é um estudante, " + id);
+        if (student.getStatus().equals(GeneralStatus.INACTIVE)) {
+            throw new IllegalStateException("Estudante já desativado, " + id);
         }
+
+        student.setStatus(GeneralStatus.INACTIVE);
+        repository.save(student);
+
     }
 
     // haverá um popup no front que perguntará se o estudante irá participar da viagem
@@ -145,11 +141,11 @@ public class StudentService {
     // MÉTODOS AUXILIARES
 
     private List<StudentResponseDTO> getStudentsByStatus(GeneralStatus status) {
-        List<UserModel> students = repository.findAllByStatus(status);
-        if (students.isEmpty()) Collections.emptyList();
-        return students.stream().filter(student -> student instanceof Student)
-                .map(student -> studentConverted((Student) student))
-                .toList();
+        List<Student> students = repository.findAllByStatus(status);
+
+        if (students.isEmpty()) return Collections.emptyList();
+
+        return students.stream().map(student -> studentConverted((Student) student)).toList();
     }
 
     private Student studentMapper(StudentRequestDTO requestDTO) {

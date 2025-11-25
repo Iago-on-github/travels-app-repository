@@ -12,7 +12,6 @@ import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
-import com.travel_system.backend_app.repository.UserModelRepository;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -128,7 +127,12 @@ class TravelServiceTest {
 
             assertEquals(TravelStatus.TRAVELLING, travel.getTravelStatus());
 
-            verify(mapboxAPIService, times(1)).calculateRoute(travel.getOriginLongitude(), travel.getOriginLatitude(), travel.getFinalLongitude(), travel.getFinalLatitude());
+            // verify if "calculateRoute" was called exactly 1 time
+            verify(mapboxAPIService, times(1)).calculateRoute(
+                    travel.getOriginLongitude(),
+                    travel.getOriginLatitude(),
+                    travel.getFinalLongitude(),
+                    travel.getFinalLatitude());
         }
 
         @DisplayName("Deve lançar exceção quando não encontrar a viagem")

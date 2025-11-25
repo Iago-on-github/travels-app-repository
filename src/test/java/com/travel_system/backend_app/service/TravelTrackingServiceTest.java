@@ -1,5 +1,9 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.exceptions.RecalculateEtaException;
+import com.travel_system.backend_app.exceptions.TravelException;
+import com.travel_system.backend_app.exceptions.TravelStudentAssociationNotFoundException;
+import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
@@ -19,6 +23,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import java.time.Clock;
 import java.time.Instant;
 import java.util.Collections;
 import java.util.Optional;
@@ -26,6 +31,7 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 
@@ -63,10 +69,19 @@ class TravelTrackingServiceTest {
     @Mock
     private MapboxAPIService mapboxAPIService;
 
+    @Mock
+    private Clock clock;
+
     private Travel travel;
+
     private RouteDeviationDTO routeDeviationDTO;
+    private RouteDeviationDTO routeDeviationDTORouteOff;
     private RouteDetailsDTO routeDetailsDTO;
     private PreviousStateDTO previousEta;
+
+    final long INITIAL_TIME = 1000000000000L;
+    final double PREVIOUS_DURATION = 180.0;
+    final double EXPECTED_DURATION = 120.0;
 
     @Captor
     private ArgumentCaptor<String> durationCaptor;
@@ -79,6 +94,9 @@ class TravelTrackingServiceTest {
         routeDetailsDTO = new RouteDetailsDTO(53231.0, 8638123.2, "any_geometry");
 
         routeDeviationDTO = new RouteDeviationDTO(39.4, true, 2123.3, 12434.2);
+        routeDeviationDTORouteOff = new RouteDeviationDTO(39.4, false, 2123.3, 12434.2);
+
+        previousEta = new PreviousStateDTO(18726.1, 28468753.2, 7198728L);
 
         travel = createTravelEntity(
                 UUID.randomUUID(),
@@ -108,7 +126,7 @@ class TravelTrackingServiceTest {
             Double currentLng = -21.832;
             Double currentLat = -11.321;
 
-            when(travelRepository.findById(travel.getId())).thenReturn(Optional.of(travel));
+            when(travelRepository.findById(any(UUID.class))).thenReturn(Optional.of(travel));
 
             when(routeCalculationService.isRouteDeviation(currentLat, currentLng, travel.getPolylineRoute()))
                     .thenReturn(routeDeviationDTO);
@@ -120,22 +138,145 @@ class TravelTrackingServiceTest {
 
             verify(redisTrackingService).storeLiveLocation(
                     eq(travel.getId().toString()),
-                    eq(currentLat.toString()),
-                    eq(currentLng.toString()),
-                    durationCaptor.capture());
+                    anyString(),
+                    anyString(),
+                    durationCaptor.capture()
+            );
 
             verify(redisTrackingService).storeTravelMetadata(
                     eq(travel.getId().toString()),
                     polylineCaptor.capture(),
-                    anyString(),
-                    any());
+                    eq(routeDetailsDTO.distance().toString()),
+                    eq(travel.getTravelStatus().toString())
+            );
 
-            assertEquals(routeDetailsDTO.duration().toString(),
-                    durationCaptor.getValue());
-            assertEquals(routeDetailsDTO.geometry(),
-                    polylineCaptor.getValue());
+            assertEquals(routeDetailsDTO.duration().toString(), durationCaptor.getValue());
+            assertEquals(routeDetailsDTO.geometry(), polylineCaptor.getValue());
 
             verify(redisTrackingService, never()).getPreviousEta(anyString());
+
+        }
+
+        @DisplayName("Deve processar a nova localização com sucesso quando o motorista está na rota padrão")
+        @Test
+        void shouldProcessNewLocationWithSuccessWhenIsNotRouteOff() {
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            Double currentLng = -21.832;
+            Double currentLat = -11.321;
+
+            Double currentDistance = travel.getDistance();
+            String currentPolyline = travel.getPolylineRoute();
+
+            RouteDeviationDTO deviation = new RouteDeviationDTO(
+                    39.4,       // distanceFromRoute
+                    false,      // isOffRoute
+                    2123.3,     // distance
+                    12434.2     // duration
+            );
+
+            PreviousStateDTO previousEta = new PreviousStateDTO(
+                    PREVIOUS_DURATION,   // durationRemaining
+                    28468753.2,          // distanceRemaining
+                    INITIAL_TIME         // timestamp
+            );
+
+            long FINAL_TIME = INITIAL_TIME + 60000L;
+
+            when(travelRepository.findById(travel.getId()))
+                    .thenReturn(Optional.of(travel));
+
+            when(routeCalculationService.isRouteDeviation(
+                    currentLat, currentLng, travel.getPolylineRoute()))
+                    .thenReturn(deviation);
+
+            when(redisTrackingService.getPreviousEta(travel.getId().toString()))
+                    .thenReturn(previousEta);
+
+            when(clock.millis()).thenReturn(FINAL_TIME);
+
+            travelTrackingService.processNewLocation(travel.getId(), currentLat, currentLng);
+
+            verify(redisTrackingService).storeLiveLocation(
+                    eq(travel.getId().toString()),
+                    eq(currentLat.toString()),
+                    eq(currentLng.toString()),
+                    durationCaptor.capture()
+            );
+
+            verify(redisTrackingService).storeTravelMetadata(
+                    eq(travel.getId().toString()),
+                    polylineCaptor.capture(),
+                    eq(currentDistance.toString()),
+                    eq(travel.getTravelStatus().toString())
+            );
+
+            assertEquals(String.valueOf(EXPECTED_DURATION), durationCaptor.getValue());
+            assertEquals(currentPolyline, polylineCaptor.getValue());
+
+            verify(mapboxAPIService, never()).recalculateETA(any(), any(), any(), any());
+        }
+
+        @DisplayName("Deve lançar exceção quando a viagem não for encontrada")
+        @Test
+        void throwExceptionWhenTripNotFound() {
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            Double currentLng = -21.832;
+            Double currentLat = -11.321;
+
+            when(travelRepository.findById(travel.getId())).thenReturn(Optional.empty());
+
+            TripNotFound expectedErrorMsg = assertThrows(TripNotFound.class, () -> {
+                travelTrackingService.processNewLocation(travel.getId(), currentLat, currentLng);
+            });
+
+            assertEquals("Trip not found", expectedErrorMsg.getMessage());
+
+            verify(routeCalculationService, never()).isRouteDeviation(any(), any(), anyString());
+            verify(mapboxAPIService, never()).recalculateETA(any(), any(), any(), any());
+            verify(redisTrackingService, never()).getPreviousEta(anyString());
+        }
+
+        @DisplayName("Deve lançar exceção quando o TravelStatus não for TRAVELLING")
+        @Test
+        void throwExceptionWhenTravelStatusIsNotTravelling() {
+            travel.setTravelStatus(TravelStatus.PENDING);
+
+            Double currentLng = -21.832;
+            Double currentLat = -11.321;
+
+            when(travelRepository.findById(travel.getId())).thenReturn(Optional.of(travel));
+
+            TravelException expectedErrorMsg = assertThrows(TravelException.class, () -> {
+                travelTrackingService.processNewLocation(travel.getId(), currentLat, currentLng);
+            });
+
+            assertEquals("A viagem não está em andamento", expectedErrorMsg.getMessage());
+
+            verify(routeCalculationService, never()).isRouteDeviation(any(), any(), anyString());
+            verify(mapboxAPIService, never()).recalculateETA(any(), any(), any(), any());
+            verify(redisTrackingService, never()).getPreviousEta(anyString());
+        }
+
+        @DisplayName("Deve lançar exceção quando o service de recalcular o ETA falhar")
+        @Test
+        void shouldThrowRecalculateEtaExceptionWhenRecalculationAPIFails() {
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+
+            when(routeCalculationService.isRouteDeviation(any(), any(), anyString())).thenReturn(routeDeviationDTO);
+
+            when(travelRepository.findById(travel.getId())).thenReturn(Optional.of(travel));
+
+            Double currentLng = -21.832;
+            Double currentLat = -11.321;
+
+            assertThrows(RecalculateEtaException.class, () -> {
+                travelTrackingService.processNewLocation(travel.getId(), currentLat, currentLng);
+            });
+
+            verify(redisTrackingService, never()).storeLiveLocation(anyString(), any(), any(), anyString());
+            verify(redisTrackingService, never()).storeTravelMetadata(anyString(), any(), any(), anyString());
         }
     }
 

@@ -11,7 +11,7 @@ import java.util.Set;
 import java.util.UUID;
 
 @Entity
-@DiscriminatorValue("STUDENT")
+@Table(name = "STUDENT_TABLE")
 public class Student extends UserModel {
     @Enumerated(EnumType.STRING)
     private InstitutionType institutionType;

@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.UUID;
 
 @Entity
-@DiscriminatorValue("DRIVER")
+@Table(name = "DRIVER_TABLE")
 public class Driver extends UserModel {
     @Enumerated(EnumType.STRING)
     private Role role;

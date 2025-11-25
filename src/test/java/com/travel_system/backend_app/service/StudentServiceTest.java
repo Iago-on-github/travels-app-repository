@@ -7,7 +7,6 @@ import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.InstitutionType;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
-import com.travel_system.backend_app.repository.UserModelRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

@@ -1,40 +1,57 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.model.Student;
-import com.travel_system.backend_app.model.StudentTravel;
-import com.travel_system.backend_app.model.Travel;
-import com.travel_system.backend_app.model.UserModel;
-import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
+import com.travel_system.backend_app.model.*;
+import com.travel_system.backend_app.model.dtos.TravelRequestDTO;
+import com.travel_system.backend_app.model.dtos.TravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
-import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDeviationDTO;
+import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.TravelStatus;
+import com.travel_system.backend_app.repository.DriverRepository;
+import com.travel_system.backend_app.repository.StudentRepository;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
-import com.travel_system.backend_app.repository.UserModelRepository;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class TravelService {
+
     private TravelRepository travelRepository;
     private StudentTravelRepository studentTravelRepository;
-    private UserModelRepository userModelRepository;
+    private StudentRepository studentRepository;
+    private DriverRepository driverRepository;
     private MapboxAPIService mapboxAPIService;
     private RedisTrackingService redisTrackingService;
 
     @Autowired
-    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, UserModelRepository userModelRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService) {
+    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService) {
         this.travelRepository = travelRepository;
         this.studentTravelRepository = studentTravelRepository;
-        this.userModelRepository = userModelRepository;
+        this.studentRepository = studentRepository;
+        this.driverRepository = driverRepository;
         this.mapboxAPIService = mapboxAPIService;
         this.redisTrackingService = redisTrackingService;
+    }
+
+    public TravelResponseDTO createTravel(TravelRequestDTO travelRequestDTO) {
+        Travel travel = new Travel();
+
+        Driver driver = driverRepository.findById(travelRequestDTO.driverId()).orElseThrow(EntityNotFoundException::new);
+
+        if (driver.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Motorista inativo. Não é possível prosseguir.");
+
+        travel.setTravelStatus(TravelStatus.PENDING);
+        travel.setDriver(driver);
+
+        travelRepository.save(travel);
+
+        return travelConverted(travel);
     }
 
     @Transactional
@@ -135,10 +152,10 @@ public class TravelService {
     private void persistStudentLink(Travel actualTrip, UUID studentId) {
         StudentTravel studentTravel = new StudentTravel();
 
-        UserModel studentReferenceId = userModelRepository.getReferenceById(studentId);
+        Student studentReferenceId = studentRepository.getReferenceById(studentId);
 
         studentTravel.setTravel(actualTrip);
-        studentTravel.setStudent((Student) studentReferenceId);
+        studentTravel.setStudent(studentReferenceId);
         studentTravel.setEmbark(true);
         studentTravel.setEmbarkHour(Instant.now());
 
@@ -157,5 +174,16 @@ public class TravelService {
 
     private void throwTravelException(String msg) {
         throw new TravelException(msg);
+    }
+
+    private TravelResponseDTO travelConverted(Travel travel) {
+        return new TravelResponseDTO(
+                travel.getId(),
+                travel.getTravelStatus(),
+                travel.getDriver(),
+                travel.getStudentTravels(),
+                travel.getStartHourTravel(),
+                travel.getEndHourTravel()
+        );
     }
 }

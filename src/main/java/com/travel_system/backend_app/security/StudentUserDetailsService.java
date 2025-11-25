@@ -1,34 +1,31 @@
 package com.travel_system.backend_app.security;
 
-import com.travel_system.backend_app.repository.UserModelRepository;
 import com.travel_system.backend_app.model.Student;
+import com.travel_system.backend_app.repository.StudentRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Service
 public class StudentUserDetailsService implements UserDetailsService {
 
-    private final UserModelRepository userModelRepository;
+    private StudentRepository studentRepository;
 
-    public StudentUserDetailsService(UserModelRepository userModelRepository) {
-        this.userModelRepository = userModelRepository;
+    public StudentUserDetailsService(StudentRepository studentRepository) {
+        this.studentRepository = studentRepository;
     }
-
 
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
 
-        var user = userModelRepository.findByEmail(email)
+        Student student = studentRepository.findByEmail(email)
                 .orElseThrow(() ->
-                    new UsernameNotFoundException("Um estudante não pôde ser encontrado com o email informado")
-                );
+                        new UsernameNotFoundException("Um estudante não pôde ser encontrado com o email informado"));
 
-        if (!(user instanceof Student)) {
-            throw new UsernameNotFoundException("Usuário encontrado não é um estudante");
-        }
 
-        return new StudentUserDetails((Student) user);
+        return new StudentUserDetails(student);
     }
 }
