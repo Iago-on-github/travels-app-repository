@@ -16,9 +16,6 @@ public class Student extends UserModel {
     @Enumerated(EnumType.STRING)
     private InstitutionType institutionType;
     private String course;
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private Role role;
     @OneToMany(mappedBy = "student")
     private Set<StudentTravel> studentTravels = new HashSet<>();
 
@@ -32,14 +29,12 @@ public class Student extends UserModel {
 //        this.role = role;
 //    }
 
-        public Student(String email, String password, String name, String lastName,
-                   String telephone, String profilePicture, InstitutionType institutionType,
-                   String course, GeneralStatus status, Role role) {
-        super(email, password, name, lastName, telephone, profilePicture);
+
+    public Student(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, InstitutionType institutionType, String course, Set<StudentTravel> studentTravels) {
+        super(id, email, password, name, lastName, telephone, profilePicture, role, GeneralStatus.ACTIVE, createdAt, updatedAt);
         this.institutionType = institutionType;
         this.course = course;
-        this.setStatus(GeneralStatus.ACTIVE);
-        this.role = Role.ROLE_USER;
+        this.studentTravels = studentTravels;
     }
 
     public InstitutionType getInstitutionType() {
@@ -56,14 +51,6 @@ public class Student extends UserModel {
 
     public void setCourse(String course) {
         this.course = course;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
     }
 
     public Set<StudentTravel> getStudentTravels() {

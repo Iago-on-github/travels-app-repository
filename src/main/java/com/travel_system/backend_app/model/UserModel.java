@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.model;
 
 import com.travel_system.backend_app.model.enums.GeneralStatus;
+import com.travel_system.backend_app.model.enums.Role;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
@@ -25,6 +26,7 @@ public abstract class UserModel {
     private String lastName;
     private String telephone;
     private String profilePicture;
+    private Role role;
     @Enumerated(EnumType.STRING)
     private GeneralStatus status;
     @CreatedDate
@@ -34,7 +36,7 @@ public abstract class UserModel {
 
     public UserModel() {}
 
-    public UserModel(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public UserModel(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.email = email;
         this.password = password;
@@ -42,6 +44,7 @@ public abstract class UserModel {
         this.lastName = lastName;
         this.telephone = telephone;
         this.profilePicture = profilePicture;
+        this.role = role;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
@@ -134,6 +137,14 @@ public abstract class UserModel {
 
     public void setUpdatedAt(LocalDateTime updatedAt) {
         this.updatedAt = updatedAt;
+    }
+
+    public Role getRole() {
+        return role;
+    }
+
+    public void setRole(Role role) {
+        this.role = role;
     }
 
     @Override

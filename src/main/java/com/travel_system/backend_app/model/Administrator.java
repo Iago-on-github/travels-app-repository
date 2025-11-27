@@ -12,18 +12,12 @@ import java.util.UUID;
 @Entity
 @Table(name = "ADMIN_TABLE")
 public class Administrator extends UserModel {
-    @Column(nullable = false)
-    private Role role;
 
     public Administrator() {
     }
 
-    public Administrator(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, Role role) {
-        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt);
-        this.role = Role.ROLE_ADMIN;
+    public Administrator(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+        super(id, email, password, name, lastName, telephone, profilePicture, role, status, createdAt, updatedAt);
     }
 
-    public Role getRole() {
-        return role;
-    }
 }

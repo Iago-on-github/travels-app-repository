@@ -12,8 +12,6 @@ import java.util.UUID;
 @Entity
 @Table(name = "DRIVER_TABLE")
 public class Driver extends UserModel {
-    @Enumerated(EnumType.STRING)
-    private Role role;
     private String areaOfActivity;
     private Integer totalTrips;
     @OneToMany(mappedBy = "driver")
@@ -22,19 +20,11 @@ public class Driver extends UserModel {
     public Driver() {
     }
 
-    public Driver(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, Role role, String areaOfActivity, Integer totalTrips) {
-        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt);
-        this.role = Role.ROLE_USER;
+    public Driver(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, String areaOfActivity, Integer totalTrips, List<Travel> travels) {
+        super(id, email, password, name, lastName, telephone, profilePicture, role, status, createdAt, updatedAt);
         this.areaOfActivity = areaOfActivity;
         this.totalTrips = totalTrips;
-    }
-
-    public Role getRole() {
-        return role;
-    }
-
-    public void setRole(Role role) {
-        this.role = role;
+        this.travels = travels;
     }
 
     public String getAreaOfActivity() {
