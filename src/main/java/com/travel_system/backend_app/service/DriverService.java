@@ -108,7 +108,7 @@ public class DriverService {
                 .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado, " + id));
 
         if (driver.getStatus().equals(GeneralStatus.INACTIVE)) {
-            throw new IllegalStateException("Driver já desativado, " + id);
+            throw new InactiveAccountModificationException("Driver já desativado, " + id);
         }
 
         driver.setStatus(GeneralStatus.INACTIVE);
@@ -127,7 +127,7 @@ public class DriverService {
             return Collections.emptyList();
         }
 
-        return drivers.stream().map(driver -> driverConverted((Driver) driver)).toList();
+        return drivers.stream().map(this::driverConverted).toList();
     }
 
     private Driver driverMapper(DriverRequestDTO requestDTO) {

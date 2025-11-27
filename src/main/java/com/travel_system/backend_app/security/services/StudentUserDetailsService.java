@@ -1,13 +1,12 @@
-package com.travel_system.backend_app.security;
+package com.travel_system.backend_app.security.services;
 
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.repository.StudentRepository;
+import com.travel_system.backend_app.security.StudentUserDetails;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-
-import java.util.Optional;
 
 @Service
 public class StudentUserDetailsService implements UserDetailsService {

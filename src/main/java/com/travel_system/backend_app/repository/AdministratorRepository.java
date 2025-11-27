@@ -1,11 +1,24 @@
 package com.travel_system.backend_app.repository;
 
 import com.travel_system.backend_app.model.Administrator;
+import com.travel_system.backend_app.model.dtos.AdministratorResponseDTO;
+import com.travel_system.backend_app.model.enums.GeneralStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface AdministratorRepository extends JpaRepository<Administrator, UUID> {
+    List<Administrator> findByStatus(GeneralStatus generalStatus);
+
+    Optional<Administrator> findByEmail(String email);
+
+    Optional<Administrator> findByTelephone(String email);
+
+    Optional<Administrator> findByEmailOrTelephoneAndIdNot(String email, String telephone, UUID id);
+
+    Optional<Administrator> findByEmailOrTelephone(String authenticatedAdmEmail, String authenticatedAdmTelephone);
 }

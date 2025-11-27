@@ -6,7 +6,6 @@ import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.DriverRequestDTO;
 import com.travel_system.backend_app.model.dtos.DriverResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.repository.UserModelRepository;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;

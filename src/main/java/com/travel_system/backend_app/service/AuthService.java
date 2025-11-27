@@ -1,7 +1,7 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.security.StudentUserDetails;
-import com.travel_system.backend_app.security.StudentUserDetailsService;
+import com.travel_system.backend_app.security.services.StudentUserDetailsService;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
