@@ -2,8 +2,8 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.*;
-import com.travel_system.backend_app.model.dtos.TravelRequestDTO;
-import com.travel_system.backend_app.model.dtos.TravelResponseDTO;
+import com.travel_system.backend_app.model.dtos.request.TravelRequestDTO;
+import com.travel_system.backend_app.model.dtos.response.TravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.TravelStatus;

@@ -1,6 +1,4 @@
-package com.travel_system.backend_app.model.dtos;
-
-import com.travel_system.backend_app.model.enums.Role;
+package com.travel_system.backend_app.model.dtos.request;
 
 public record AdministratorRequestDTO(
         String email,

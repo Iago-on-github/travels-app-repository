@@ -1,6 +1,4 @@
-package com.travel_system.backend_app.model.dtos;
-
-import com.travel_system.backend_app.model.enums.InstitutionType;
+package com.travel_system.backend_app.model.dtos.response;
 
 import java.time.LocalDateTime;
 import java.util.UUID;

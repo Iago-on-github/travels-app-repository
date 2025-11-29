@@ -2,8 +2,8 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.*;
-import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
-import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
+import com.travel_system.backend_app.model.dtos.request.StudentRequestDTO;
+import com.travel_system.backend_app.model.dtos.response.StudentResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.InstitutionType;
 import com.travel_system.backend_app.repository.StudentTravelRepository;

@@ -1,20 +1,14 @@
 package com.travel_system.backend_app.controller;
 
-import com.travel_system.backend_app.model.Administrator;
-import com.travel_system.backend_app.model.dtos.AdministratorResponseDTO;
+import com.travel_system.backend_app.model.dtos.response.AdministratorResponseDTO;
 import com.travel_system.backend_app.repository.AdministratorRepository;
-import com.travel_system.backend_app.security.AdministratorUserDetails;
 import com.travel_system.backend_app.service.AdministratorService;
-import jakarta.persistence.EntityNotFoundException;
-import org.apache.tomcat.websocket.AuthenticationException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/admins")
@@ -23,6 +17,7 @@ public class AdministratorController {
     private AdministratorService administratorService;
     private AdministratorRepository administratorRepository;
 
+    @Autowired
     public AdministratorController(AdministratorService administratorService, AdministratorRepository administratorRepository) {
         this.administratorService = administratorService;
         this.administratorRepository = administratorRepository;
@@ -43,25 +38,22 @@ public class AdministratorController {
         return ResponseEntity.ok().body(administratorService.getAllInactiveAdministrators());
     }
 
-    @GetMapping("/logged")
-    public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile() throws AuthenticationException {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+//    @GetMapping("/logged")
+//    public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile() throws AuthenticationException {
+//        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+//
+//    }
 
-
+    @PutMapping("/disable/{id}")
+    public ResponseEntity<Void> disableAdministrator(@PathVariable UUID id) {
+        administratorService.disableAdministrator(id);
+        return ResponseEntity.noContent().build();
     }
 
-    private AdministratorResponseDTO admConverted(Administrator adm) {
-        return new AdministratorResponseDTO(
-                adm.getEmail(),
-                adm.getPassword(),
-                adm.getName(),
-                adm.getLastName(),
-                adm.getRole(),
-                adm.getTelephone(),
-                adm.getProfilePicture(),
-                adm.getStatus(),
-                adm.getCreatedAt(),
-                adm.getUpdatedAt()
-        );
+    @PutMapping("/enable/{id}")
+    public ResponseEntity<Void> enableAdministrator(@PathVariable UUID id) {
+        administratorService.enableAdministrator(id);
+        return ResponseEntity.noContent().build();
     }
+
 }

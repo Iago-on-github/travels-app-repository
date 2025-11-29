@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.repository;
 
 import com.travel_system.backend_app.model.Administrator;
-import com.travel_system.backend_app.model.dtos.AdministratorResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

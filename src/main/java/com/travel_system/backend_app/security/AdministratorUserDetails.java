@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.security;
 
 import com.travel_system.backend_app.model.Administrator;
-import org.springframework.boot.autoconfigure.task.TaskExecutionProperties;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

@@ -1,4 +1,4 @@
-package com.travel_system.backend_app.model.dtos;
+package com.travel_system.backend_app.model.dtos.response;
 
 import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.StudentTravel;

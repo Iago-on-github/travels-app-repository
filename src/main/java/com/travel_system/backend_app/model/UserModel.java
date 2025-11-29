@@ -6,14 +6,19 @@ import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-@EntityListeners(AuditingEntityListener.class)
-@MappedSuperclass
-public abstract class UserModel {
+@Entity
+@Table(name = "USER_TABLE")
+@Inheritance(strategy = InheritanceType.JOINED)
+public class UserModel implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
@@ -26,6 +31,7 @@ public abstract class UserModel {
     private String lastName;
     private String telephone;
     private String profilePicture;
+    @Enumerated(EnumType.STRING)
     private Role role;
     @Enumerated(EnumType.STRING)
     private GeneralStatus status;
@@ -57,6 +63,36 @@ public abstract class UserModel {
         this.lastName = lastName;
         this.telephone = telephone;
         this.profilePicture = profilePicture;
+    }
+
+    @Override
+    public Collection<? extends GrantedAuthority> getAuthorities() {
+        return List.of();
+    }
+
+    @Override
+    public String getUsername() {
+        return "";
+    }
+
+    @Override
+    public boolean isAccountNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isAccountNonLocked() {
+        return true;
+    }
+
+    @Override
+    public boolean isCredentialsNonExpired() {
+        return true;
+    }
+
+    @Override
+    public boolean isEnabled() {
+        return true;
     }
 
     public UUID getId() {

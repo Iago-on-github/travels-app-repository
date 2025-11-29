@@ -1,7 +1,7 @@
 package com.travel_system.backend_app.controller;
 
-import com.travel_system.backend_app.model.dtos.StudentRequestDTO;
-import com.travel_system.backend_app.model.dtos.StudentResponseDTO;
+import com.travel_system.backend_app.model.dtos.request.StudentRequestDTO;
+import com.travel_system.backend_app.model.dtos.response.StudentResponseDTO;
 import com.travel_system.backend_app.service.StudentService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;

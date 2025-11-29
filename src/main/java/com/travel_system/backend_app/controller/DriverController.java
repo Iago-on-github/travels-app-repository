@@ -1,7 +1,7 @@
 package com.travel_system.backend_app.controller;
 
-import com.travel_system.backend_app.model.dtos.DriverRequestDTO;
-import com.travel_system.backend_app.model.dtos.DriverResponseDTO;
+import com.travel_system.backend_app.model.dtos.request.DriverRequestDTO;
+import com.travel_system.backend_app.model.dtos.response.DriverResponseDTO;
 import com.travel_system.backend_app.service.DriverService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
