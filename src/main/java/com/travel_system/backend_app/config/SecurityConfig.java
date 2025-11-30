@@ -1,6 +1,6 @@
 package com.travel_system.backend_app.config;
 
-import com.travel_system.backend_app.service.AuthService;
+import com.travel_system.backend_app.security.AuthService;
 import com.travel_system.backend_app.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -20,10 +20,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(AuthService authService) {
-        return new JwtAuthenticationFilter(
-                authService
-        );
+    public JwtAuthenticationFilter jwtAuthenticationFilter(TokenConfig tokenConfig) {
+        return new JwtAuthenticationFilter(tokenConfig);
     }
 
     @Bean
