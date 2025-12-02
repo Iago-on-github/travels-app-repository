@@ -44,7 +44,7 @@ public class TokenConfig {
         algorithm = Algorithm.HMAC256(secret.getBytes());
     }
 
-    private LoginResponseDTO createAccessToken(String username, List<String> roles)  {
+    public LoginResponseDTO createAccessToken(String username, List<String> roles)  {
         Instant now = Instant.now();
         Instant validity = now.plus(validityInMilliseconds, ChronoUnit.MILLIS);
 

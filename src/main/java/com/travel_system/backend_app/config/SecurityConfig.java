@@ -1,6 +1,5 @@
 package com.travel_system.backend_app.config;
 
-import com.travel_system.backend_app.security.AuthService;
 import com.travel_system.backend_app.security.JwtAuthenticationFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
