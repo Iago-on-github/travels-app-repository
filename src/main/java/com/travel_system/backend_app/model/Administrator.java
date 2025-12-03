@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.model;
 
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.model.enums.Role;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
@@ -18,8 +17,8 @@ public class Administrator extends UserModel {
     public Administrator() {
     }
 
-    public Administrator(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, String cpf, String birthDate) {
-        super(id, email, password, name, lastName, telephone, profilePicture, Role.ROLE_ADMIN, status, createdAt, updatedAt);
+    public Administrator(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, String cpf, String birthDate) {
+        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt);
         this.cpf = cpf;
         this.birthDate = birthDate;
     }

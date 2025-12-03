@@ -1,27 +1,15 @@
-package com.travel_system.backend_app.security;
+package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.config.TokenConfig;
 import com.travel_system.backend_app.exceptions.EmailNotFoundException;
 import com.travel_system.backend_app.model.dtos.request.LoginRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.LoginResponseDTO;
 import com.travel_system.backend_app.repository.UserRepository;
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
-
-import java.security.Key;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
 
 @Service
 public class AuthService {
@@ -36,22 +24,33 @@ public class AuthService {
         this.tokenConfig = tokenConfig;
     }
 
-    public ResponseEntity signin(LoginRequestDTO loginRequestDto) {
+    @SuppressWarnings("rawtypes")
+    public ResponseEntity signing(LoginRequestDTO loginRequestDto) {
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequestDto.email(), loginRequestDto.password()));
 
             var user = userRepository.findUserByEmail(loginRequestDto.email());
 
-            if (user.isEmpty()){
-                throw new EmailNotFoundException("Email ou senha inválidos. Tente novamente");
+            if (user == null){
+                throw new EmailNotFoundException("Email não encontrado. Tente novamente");
             }
-// verificar a classe "user" e implementar os métodos faltantes de roles.
 
-//            var tokenResponse = tokenConfig.createAccessToken(loginRequestDto.email(), user.);
+            var tokenResponse = tokenConfig.createAccessToken(loginRequestDto.email(), user.getRoles());
+            return ResponseEntity.ok().body(tokenResponse);
 
         } catch (Exception e) {
-            System.out.println(e.getCause());
+            throw new BadCredentialsException("Email ou senha inválidos. Tente novamente");
         }
-        return null;
+    }
+
+    @SuppressWarnings("rawtypes")
+    public ResponseEntity refreshToken(String email, String refreshToken) {
+        var user = userRepository.findUserByEmail(email);
+
+        if (user == null) throw new EmailNotFoundException("Email não encontrado. Tente novamente");
+
+        var loginResponse = tokenConfig.refreshToken(refreshToken);
+
+        return ResponseEntity.ok().body(loginResponse);
     }
 }

@@ -18,7 +18,6 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.time.Instant;
-import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Base64;
 import java.util.Date;
@@ -44,38 +43,51 @@ public class TokenConfig {
         algorithm = Algorithm.HMAC256(secret.getBytes());
     }
 
-    public LoginResponseDTO createAccessToken(String username, List<String> roles)  {
+    public LoginResponseDTO createAccessToken(String email, List<String> roles)  {
         Instant now = Instant.now();
         Instant validity = now.plus(validityInMilliseconds, ChronoUnit.MILLIS);
 
-        var accessToken = getAccessToken(username, roles, now, validity);
-        var refreshToken = getRefreshToken(username, roles, now);
+        var accessToken = getAccessToken(email, roles, now, validity);
+        var refreshToken = getRefreshToken(email, roles, now);
 
-        return new LoginResponseDTO(username, true, now, validity, accessToken, refreshToken);
+        return new LoginResponseDTO(email, true, now, validity, accessToken, refreshToken);
     }
 
-    private String getAccessToken(String username, List<String> roles, Instant now, Instant validity) {
+    private String getAccessToken(String email, List<String> roles, Instant now, Instant validity) {
         String issuerUri = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
         return JWT.create()
                 .withClaim("roles", roles)
                 .withIssuedAt(now)
                 .withExpiresAt(validity)
-                .withSubject(username)
+                .withSubject(email)
                 .withIssuer(issuerUri)
                 .sign(algorithm)
                 .strip();
     }
 
-    private String getRefreshToken(String username, List<String> roles, Instant now) {
+    private String getRefreshToken(String email, List<String> roles, Instant now) {
         Instant validityRefreshToken = now.plus(validityInMilliseconds * 3, ChronoUnit.MILLIS);
         return JWT.create()
                 .withClaim("roles", roles)
                 .withIssuedAt(now)
                 .withExpiresAt(validityRefreshToken)
-                .withSubject(username)
+                .withSubject(email)
                 .sign(algorithm)
                 .strip();
     }
+
+    public LoginResponseDTO refreshToken(String refreshToken) {
+        if (refreshToken.contains("Bearer ")) refreshToken = refreshToken.substring("Bearer ".length());
+
+        JWTVerifier jwtVerifier = JWT.require(algorithm).build();
+        DecodedJWT decodedJWT = jwtVerifier.verify(refreshToken);
+
+        String email = decodedJWT.getSubject();
+        List<String> roles = decodedJWT.getClaim("roles").asList(String.class);
+
+        return createAccessToken(email, roles);
+    }
+
 
     // extrai infos de autenticacao do token
     public Authentication getAuthentication(String token) {

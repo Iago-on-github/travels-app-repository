@@ -1,0 +1,28 @@
+package com.travel_system.backend_app.model;
+
+import jakarta.persistence.*;
+import org.springframework.security.core.GrantedAuthority;
+
+import java.util.UUID;
+
+@Entity
+@Table(name = "PERMISSIONS_TABLE")
+public class Permissions implements GrantedAuthority {
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    private String description;
+
+    public UUID getId() {
+        return id;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    @Override
+    public String getAuthority() {
+        return description;
+    }
+}

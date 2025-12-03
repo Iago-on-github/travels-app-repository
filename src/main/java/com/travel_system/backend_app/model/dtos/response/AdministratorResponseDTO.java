@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.model.dtos.response;
 
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.model.enums.Role;
 
 import java.time.LocalDateTime;
 
@@ -10,7 +9,6 @@ public record AdministratorResponseDTO(
         String password,
         String name,
         String lastName,
-        Role role,
         String telephone,
         String profilePicture,
         GeneralStatus status,

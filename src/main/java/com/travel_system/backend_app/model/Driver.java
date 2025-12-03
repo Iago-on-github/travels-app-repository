@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.model;
 
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.model.enums.Role;
 import jakarta.persistence.*;
 
 import java.time.LocalDateTime;
@@ -20,8 +19,8 @@ public class Driver extends UserModel {
     public Driver() {
     }
 
-    public Driver(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, String areaOfActivity, Integer totalTrips, List<Travel> travels) {
-        super(id, email, password, name, lastName, telephone, profilePicture, role, status, createdAt, updatedAt);
+    public Driver(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, String areaOfActivity, Integer totalTrips, List<Travel> travels) {
+        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt);
         this.areaOfActivity = areaOfActivity;
         this.totalTrips = totalTrips;
         this.travels = travels;

@@ -159,7 +159,6 @@ public class AdministratorService {
                 adm.getPassword(),
                 adm.getName(),
                 adm.getLastName(),
-                adm.getRole(),
                 adm.getTelephone(),
                 adm.getProfilePicture(),
                 adm.getStatus(),

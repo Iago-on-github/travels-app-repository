@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.model;
 
 import com.travel_system.backend_app.model.enums.InstitutionType;
-import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import jakarta.persistence.*;
 
@@ -29,12 +28,10 @@ public class Student extends UserModel {
 //        this.role = role;
 //    }
 
-
-    public Student(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, InstitutionType institutionType, String course, Set<StudentTravel> studentTravels) {
-        super(id, email, password, name, lastName, telephone, profilePicture, role, GeneralStatus.ACTIVE, createdAt, updatedAt);
+    public Student(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, InstitutionType institutionType, String course) {
+        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt);
         this.institutionType = institutionType;
         this.course = course;
-        this.studentTravels = studentTravels;
     }
 
     public InstitutionType getInstitutionType() {

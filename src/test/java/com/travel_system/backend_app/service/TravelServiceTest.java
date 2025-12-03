@@ -8,7 +8,6 @@ import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.InstitutionType;
-import com.travel_system.backend_app.model.enums.Role;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
@@ -23,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.Optional;
 import java.util.Set;
@@ -59,8 +59,6 @@ class TravelServiceTest {
     @Mock
     private StudentTravelRepository studentTravelRepository;
     @Mock
-    private UserModelRepository userModelRepository;
-    @Mock
     private MapboxAPIService mapboxAPIService;
     @Mock
     private RedisTrackingService redisTrackingService;
@@ -76,7 +74,7 @@ class TravelServiceTest {
 
     @BeforeEach
     void setUp() {
-        student = new Student("student@gmail.com", "student_password", "student", "student_last", "283647823", null, InstitutionType.UNIVERSITY, "any_course", GeneralStatus.ACTIVE, Role.ROLE_USER);
+        student = new Student(UUID.randomUUID(), "student@gmail.com", "passStudent", "nameStudent", "lastNameStudent", "74244424", null, GeneralStatus.ACTIVE, LocalDateTime.now(), null, InstitutionType.UNIVERSITY, "testeCourse");
 
         travel = createTravelEntity(
                 UUID.randomUUID(),
@@ -256,7 +254,7 @@ class TravelServiceTest {
             travel.setTravelStatus(TravelStatus.TRAVELLING);
 
             when(travelRepository.getReferenceById(travel.getId())).thenReturn(travel);
-            when(userModelRepository.getReferenceById(student.getId())).thenReturn(student);
+//            when(userModelRepository.getReferenceById(student.getId())).thenReturn(student);
 
             travelService.joinTravel(travel.getId(), student.getId());
 

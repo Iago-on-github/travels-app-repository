@@ -1,19 +1,14 @@
 package com.travel_system.backend_app.model;
 
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.model.enums.Role;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
-import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
-import java.util.List;
-import java.util.Objects;
-import java.util.UUID;
+import java.util.*;
 
 @Entity
 @Table(name = "USER_TABLE")
@@ -32,17 +27,19 @@ public class UserModel implements UserDetails {
     private String telephone;
     private String profilePicture;
     @Enumerated(EnumType.STRING)
-    private Role role;
-    @Enumerated(EnumType.STRING)
     private GeneralStatus status;
     @CreatedDate
     private LocalDateTime createdAt;
     @LastModifiedDate
     private LocalDateTime updatedAt;
+    @ManyToMany
+    @JoinTable(name = "user_permissions", joinColumns = {@JoinColumn (name="id_user")},
+    inverseJoinColumns = {@JoinColumn (name = "id_permission")})
+    private List<Permissions> permissions = new ArrayList<>();
 
     public UserModel() {}
 
-    public UserModel(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, Role role, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
+    public UserModel(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt) {
         this.id = id;
         this.email = email;
         this.password = password;
@@ -50,24 +47,22 @@ public class UserModel implements UserDetails {
         this.lastName = lastName;
         this.telephone = telephone;
         this.profilePicture = profilePicture;
-        this.role = role;
         this.status = status;
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
     }
 
-    public UserModel(String email, String password, String name, String lastName, String telephone, String profilePicture) {
-        this.email = email;
-        this.password = password;
-        this.name = name;
-        this.lastName = lastName;
-        this.telephone = telephone;
-        this.profilePicture = profilePicture;
+    public List<String> getRoles() {
+        List<String> roles = new ArrayList<>();
+        for (Permissions permission : permissions) {
+            roles.add(permission.getDescription());
+        }
+        return roles;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of();
+        return this.permissions;
     }
 
     @Override
@@ -175,12 +170,12 @@ public class UserModel implements UserDetails {
         this.updatedAt = updatedAt;
     }
 
-    public Role getRole() {
-        return role;
+    public List<Permissions> getPermissions() {
+        return permissions;
     }
 
-    public void setRole(Role role) {
-        this.role = role;
+    public void setPermissions(List<Permissions> permissions) {
+        this.permissions = permissions;
     }
 
     @Override
