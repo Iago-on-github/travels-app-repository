@@ -1,12 +1,17 @@
 package com.travel_system.backend_app.controller;
 
+import com.travel_system.backend_app.model.Administrator;
+import com.travel_system.backend_app.model.dtos.request.AdministratorRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.AdministratorResponseDTO;
 import com.travel_system.backend_app.repository.AdministratorRepository;
 import com.travel_system.backend_app.service.AdministratorService;
+import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,12 +20,10 @@ import java.util.UUID;
 public class AdministratorController {
 
     private AdministratorService administratorService;
-    private AdministratorRepository administratorRepository;
 
     @Autowired
-    public AdministratorController(AdministratorService administratorService, AdministratorRepository administratorRepository) {
+    public AdministratorController(AdministratorService administratorService) {
         this.administratorService = administratorService;
-        this.administratorRepository = administratorRepository;
     }
 
     @GetMapping
@@ -38,11 +41,19 @@ public class AdministratorController {
         return ResponseEntity.ok().body(administratorService.getAllInactiveAdministrators());
     }
 
-//    @GetMapping("/logged")
-//    public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile() throws AuthenticationException {
-//        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-//
-//    }
+    @GetMapping("/logged/{email}")
+    public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile(@PathVariable String email) {
+        return ResponseEntity.ok().body(administratorService.getLoggedAdministratorInProfile(email));
+    }
+
+    @PostMapping("/new")
+    public ResponseEntity<AdministratorResponseDTO> createAdministrator(@RequestBody AdministratorRequestDTO admRequestDTO, UriComponentsBuilder componentsBuilder) {
+        AdministratorResponseDTO newAdm = administratorService.createAdministrator(admRequestDTO);
+
+        URI uri = componentsBuilder.path("/{id}").buildAndExpand(newAdm.id()).toUri();
+
+        return ResponseEntity.created(uri).body(newAdm);
+    }
 
     @PutMapping("/disable/{id}")
     public ResponseEntity<Void> disableAdministrator(@PathVariable UUID id) {

@@ -18,6 +18,4 @@ public interface AdministratorRepository extends JpaRepository<Administrator, UU
     Optional<Administrator> findByTelephone(String email);
 
     Optional<Administrator> findByEmailOrTelephoneAndIdNot(String email, String telephone, UUID id);
-
-    Optional<Administrator> findByEmailOrTelephone(String authenticatedAdmEmail, String authenticatedAdmTelephone);
 }

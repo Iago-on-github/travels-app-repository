@@ -3,11 +3,14 @@ package com.travel_system.backend_app.service;
 import com.travel_system.backend_app.exceptions.DuplicateResourceException;
 import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
 import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
+import com.travel_system.backend_app.exceptions.PermissionNotFoundException;
 import com.travel_system.backend_app.model.Administrator;
+import com.travel_system.backend_app.model.Permissions;
 import com.travel_system.backend_app.model.dtos.request.AdministratorRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.AdministratorResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.repository.AdministratorRepository;
+import com.travel_system.backend_app.repository.PermissionsRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -21,13 +24,15 @@ import java.util.UUID;
 
 @Service
 public class AdministratorService {
-    private AdministratorRepository administratorRepository;
-    private PasswordEncoder passwordEncoder;
+    private final AdministratorRepository administratorRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final PermissionsRepository permissionsRepository;
 
     @Autowired
-    public AdministratorService(AdministratorRepository administratorRepository, PasswordEncoder passwordEncoder) {
+    public AdministratorService(AdministratorRepository administratorRepository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository) {
         this.administratorRepository = administratorRepository;
         this.passwordEncoder = passwordEncoder;
+        this.permissionsRepository = permissionsRepository;
     }
 
     public List<AdministratorResponseDTO> getAllAdministrators() {
@@ -46,8 +51,8 @@ public class AdministratorService {
         return findAdmsByStatus(GeneralStatus.INACTIVE);
     }
 
-    public AdministratorResponseDTO getLoggedAdministratorInProfile(String authenticatedAdmEmail, String authenticatedAdmTelephone) {
-        Administrator expectedLoggedAdmin = administratorRepository.findByEmailOrTelephone(authenticatedAdmEmail, authenticatedAdmTelephone)
+    public AdministratorResponseDTO getLoggedAdministratorInProfile(String authenticatedAdmEmail) {
+        Administrator expectedLoggedAdmin = administratorRepository.findByEmail(authenticatedAdmEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Administrador não encontrado"));
 
         return admConverted(expectedLoggedAdmin);
@@ -67,6 +72,12 @@ public class AdministratorService {
 
         String rawPassword = adm.getPassword();
         adm.setPassword(passwordEncoder.encode(rawPassword));
+
+        final String ROLE_ADMIN = "ROLE_ADMIN";
+        Permissions admPerm = permissionsRepository.findByDescription(ROLE_ADMIN)
+                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + ROLE_ADMIN + " não encontrada."));
+
+        adm.setPermissions(List.of(admPerm));
 
         Administrator savedAdm = administratorRepository.save(adm);
         return admConverted(savedAdm);
@@ -155,8 +166,8 @@ public class AdministratorService {
 
     private AdministratorResponseDTO admConverted(Administrator adm) {
         return new AdministratorResponseDTO(
-            adm.getEmail(),
-                adm.getPassword(),
+                adm.getId(),
+                adm.getEmail(),
                 adm.getName(),
                 adm.getLastName(),
                 adm.getTelephone(),

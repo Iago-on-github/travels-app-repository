@@ -3,10 +3,11 @@ package com.travel_system.backend_app.model.dtos.response;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public record AdministratorResponseDTO(
+        UUID id,
         String email,
-        String password,
         String name,
         String lastName,
         String telephone,
