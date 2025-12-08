@@ -1,13 +1,12 @@
 package com.travel_system.backend_app.controller;
 
-import com.travel_system.backend_app.model.Administrator;
 import com.travel_system.backend_app.model.dtos.request.AdministratorRequestDTO;
+import com.travel_system.backend_app.model.dtos.request.AdministratorUpdateDTO;
 import com.travel_system.backend_app.model.dtos.response.AdministratorResponseDTO;
-import com.travel_system.backend_app.repository.AdministratorRepository;
 import com.travel_system.backend_app.service.AdministratorService;
-import org.apache.coyote.Response;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -41,6 +40,7 @@ public class AdministratorController {
         return ResponseEntity.ok().body(administratorService.getAllInactiveAdministrators());
     }
 
+    // NAO ENVIAR PELA URL - usar spring secutiiry
     @GetMapping("/logged/{email}")
     public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile(@PathVariable String email) {
         return ResponseEntity.ok().body(administratorService.getLoggedAdministratorInProfile(email));
@@ -53,6 +53,12 @@ public class AdministratorController {
         URI uri = componentsBuilder.path("/{id}").buildAndExpand(newAdm.id()).toUri();
 
         return ResponseEntity.created(uri).body(newAdm);
+    }
+
+    @PatchMapping("/update")
+    public ResponseEntity<AdministratorResponseDTO> updateLoggedAdministrator(@RequestBody AdministratorUpdateDTO administratorUpdateDto, Authentication auth) {
+        String authEmail = auth.getName();
+        return ResponseEntity.ok().body(administratorService.updateLoggedAdministrator(authEmail, administratorUpdateDto));
     }
 
     @PutMapping("/disable/{id}")

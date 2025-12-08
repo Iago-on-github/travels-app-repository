@@ -4,9 +4,11 @@ import com.travel_system.backend_app.exceptions.DuplicateResourceException;
 import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
 import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
 import com.travel_system.backend_app.exceptions.PermissionNotFoundException;
+import com.travel_system.backend_app.interfaces.AdministratorMapper;
 import com.travel_system.backend_app.model.Administrator;
 import com.travel_system.backend_app.model.Permissions;
 import com.travel_system.backend_app.model.dtos.request.AdministratorRequestDTO;
+import com.travel_system.backend_app.model.dtos.request.AdministratorUpdateDTO;
 import com.travel_system.backend_app.model.dtos.response.AdministratorResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.repository.AdministratorRepository;
@@ -17,6 +19,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -27,12 +30,14 @@ public class AdministratorService {
     private final AdministratorRepository administratorRepository;
     private final PasswordEncoder passwordEncoder;
     private final PermissionsRepository permissionsRepository;
+    private final AdministratorMapper administratorMapper;
 
     @Autowired
-    public AdministratorService(AdministratorRepository administratorRepository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository) {
+    public AdministratorService(AdministratorRepository administratorRepository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository, AdministratorMapper administratorMapper) {
         this.administratorRepository = administratorRepository;
         this.passwordEncoder = passwordEncoder;
         this.permissionsRepository = permissionsRepository;
+        this.administratorMapper = administratorMapper;
     }
 
     public List<AdministratorResponseDTO> getAllAdministrators() {
@@ -84,25 +89,29 @@ public class AdministratorService {
     }
 
     @Transactional
-    public AdministratorResponseDTO updateLoggedAdministrator(String authenticatedEmail, AdministratorRequestDTO admRequestDTO) {
+    public AdministratorResponseDTO updateLoggedAdministrator(String authenticatedEmail, AdministratorUpdateDTO admRequestDTO) {
         Administrator loggedAdm = administratorRepository.findByEmail(authenticatedEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Administrador não encontrado, " + authenticatedEmail));
 
         if (loggedAdm.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Não é possível atualizar uma conta desativada");
 
-        Optional<Administrator> existingAdmin = administratorRepository.findByEmailOrTelephoneAndIdNot(
-                admRequestDTO.email(),
-                admRequestDTO.telephone(),
-                loggedAdm.getId());
+        if (admRequestDTO.email() != null || admRequestDTO.telephone() != null) {
+            administratorRepository.findByEmailOrTelephoneAndIdNot(
+                    admRequestDTO.email(),
+                    admRequestDTO.telephone(),
+                    loggedAdm.getId())
+                    .ifPresent(admin -> {
+                        throw new DuplicateResourceException("Email ou telefone já em uso por outro usuário.");
+                    });
+        }
 
-        if (existingAdmin.isPresent()) throw new DuplicateResourceException("Email ou telefone já em uso por outro usuário");
+        administratorMapper.administratorUpdateFromDTO(admRequestDTO, loggedAdm);
 
-        loggedAdm.setEmail(admRequestDTO.email());
-        loggedAdm.setPassword(admRequestDTO.password());
-        loggedAdm.setName(admRequestDTO.name());
-        loggedAdm.setLastName(admRequestDTO.lastName());
-        loggedAdm.setTelephone(admRequestDTO.telephone());
-        loggedAdm.setProfilePicture(admRequestDTO.profilePicture());
+        if (admRequestDTO.password() != null) {
+            loggedAdm.setPassword(passwordEncoder.encode(admRequestDTO.password()));
+        }
+
+        loggedAdm.setUpdatedAt(LocalDateTime.now());
 
         Administrator savedAdmin = administratorRepository.save(loggedAdm);
         return admConverted(savedAdmin);
@@ -155,10 +164,12 @@ public class AdministratorService {
         Administrator adm = new Administrator();
 
         adm.setEmail(admRequestDto.email());
-        adm.setPassword(admRequestDto.password());
+        adm.setPassword(passwordEncoder.encode(admRequestDto.password()));
         adm.setName(admRequestDto.name());
         adm.setLastName(admRequestDto.lastName());
         adm.setTelephone(admRequestDto.telephone());
+        adm.setStatus(GeneralStatus.ACTIVE);
+        adm.setCreatedAt(LocalDateTime.now());
         adm.setProfilePicture(admRequestDto.profilePicture());
 
         return adm;

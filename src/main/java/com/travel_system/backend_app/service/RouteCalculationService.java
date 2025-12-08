@@ -9,10 +9,10 @@ import java.util.List;
 
 @Service
 public class RouteCalculationService {
+
     private PolylineService polylineService;
 
     private final double TOLERANCE_DISTANCE = 50.0;
-
     private final double EARTH_RADIUS_METERS = 6371000;
 
     public RouteCalculationService(PolylineService polylineService) {

@@ -17,8 +17,8 @@ public class Administrator extends UserModel {
     public Administrator() {
     }
 
-    public Administrator(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, String cpf, String birthDate) {
-        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt);
+    public Administrator(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, LocalDateTime createdAt, LocalDateTime updatedAt, String cpf, String birthDate) {
+        super(id, email, password, name, lastName, telephone, profilePicture, GeneralStatus.ACTIVE, createdAt, updatedAt);
         this.cpf = cpf;
         this.birthDate = birthDate;
     }

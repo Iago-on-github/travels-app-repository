@@ -39,6 +39,7 @@ public class TravelService {
         this.redisTrackingService = redisTrackingService;
     }
 
+    @Transactional
     public TravelResponseDTO createTravel(TravelRequestDTO travelRequestDTO) {
         Travel travel = new Travel();
 
