@@ -25,13 +25,17 @@ public class SecurityConfig {
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, JwtAuthenticationFilter jwtAuthenticationFilter) throws Exception {
-        http.authorizeHttpRequests(auth ->
-                        auth.anyRequest().permitAll())
-                .csrf(AbstractHttpConfigurer::disable)
+        http.csrf(AbstractHttpConfigurer::disable)
+                .authorizeHttpRequests(auth ->
+                        auth.requestMatchers("/auth/signing").permitAll()
+                                .requestMatchers("/admins/**").hasRole("ADMIN")
+                                .anyRequest().authenticated()
+                )
                 .cors(cors -> cors.configure(http))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                ).addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -45,5 +49,4 @@ public class SecurityConfig {
     public AuthenticationManager authenticationManager(AuthenticationConfiguration configuration) throws Exception {
         return configuration.getAuthenticationManager();
     }
-
 }

@@ -23,22 +23,23 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     @Override
-    protected void doFilterInternal(
-            @NonNull HttpServletRequest request,
-            @NonNull HttpServletResponse response,
-            @NonNull FilterChain filterChain) throws ServletException, IOException {
-        try {
-            String token = tokenConfig.resolveToken(request);
-            if (token != null && tokenConfig.validateToken(token)) {
-                Authentication authentication = tokenConfig.getAuthentication(token);
-                if (authentication != null) {
-                    SecurityContextHolder.getContext().setAuthentication(authentication);
-                }
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        String token = tokenConfig.resolveToken(request);
+        System.out.println("Token recebido: " + token);
+        if (token != null) {
+            try {
+                System.out.println("Token válido? " + tokenConfig.validateToken(token));
+                Authentication auth = tokenConfig.getAuthentication(token);
+                System.out.println("Authorities: " + auth.getAuthorities());
+                SecurityContextHolder.getContext().setAuthentication(auth);
+            } catch (Exception e) {
+                System.out.println("Erro na autenticação JWT: " + e.getMessage());
             }
-        } catch (Exception exception) {
-            // Do not throw exception, just do not authenticate
+        } else {
+            System.out.println("Nenhum token encontrado no request.");
         }
-
         filterChain.doFilter(request, response);
     }
+
 }

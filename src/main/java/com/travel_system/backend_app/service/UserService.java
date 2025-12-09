@@ -5,6 +5,7 @@ import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.repository.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -16,11 +17,19 @@ public class UserService implements UserDetailsService {
     }
 
     @Override
-    public UserDetails loadUserByUsername(String username) throws EmailNotFoundException {
-        UserModel userByEmail = repository.findUserByEmail(username);
+    public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
 
-        if (username.isEmpty()) throw new EmailNotFoundException(username);
+        if (username == null || username.isBlank()) {
+            throw new UsernameNotFoundException("Email não informado.");
+        }
 
-        return userByEmail;
+        UserModel user = repository.findUserByEmail(username);
+
+        if (user == null) {
+            throw new UsernameNotFoundException("Usuário não encontrado: " + username);
+        }
+
+        return user;
     }
+
 }

@@ -32,7 +32,7 @@ public class UserModel implements UserDetails {
     private LocalDateTime createdAt;
     @LastModifiedDate
     private LocalDateTime updatedAt;
-    @ManyToMany
+    @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(name = "user_permissions", joinColumns = {@JoinColumn (name="id_user")},
     inverseJoinColumns = {@JoinColumn (name = "id_permission")})
     private List<Permissions> permissions = new ArrayList<>();
@@ -67,7 +67,7 @@ public class UserModel implements UserDetails {
 
     @Override
     public String getUsername() {
-        return "";
+        return this.email;
     }
 
     @Override
