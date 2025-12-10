@@ -40,10 +40,10 @@ public class AdministratorController {
         return ResponseEntity.ok().body(administratorService.getAllInactiveAdministrators());
     }
 
-    // NAO ENVIAR PELA URL - usar spring secutiiry
-    @GetMapping("/logged/{email}")
-    public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile(@PathVariable String email) {
-        return ResponseEntity.ok().body(administratorService.getLoggedAdministratorInProfile(email));
+    @GetMapping("/logged")
+    public ResponseEntity<AdministratorResponseDTO> getLoggedAdministratorInProfile(Authentication auth) {
+        String authEmail = auth.getName();
+        return ResponseEntity.ok().body(administratorService.getLoggedAdministratorInProfile(authEmail));
     }
 
     @PostMapping("/new")
@@ -73,4 +73,6 @@ public class AdministratorController {
         return ResponseEntity.noContent().build();
     }
 
+//    REALIZAR O TRATAMENTO DE EXCEÇÕES - QUANDO NÃO ESTÁ LOGANDO ELE RETORNA 403
+//    TOKEN EXPIRANDO MT RAPIDO
 }

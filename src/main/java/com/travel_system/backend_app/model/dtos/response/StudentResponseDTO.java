@@ -14,8 +14,6 @@ public record StudentResponseDTO(
         String telephone,
         LocalDateTime createdAt,
         InstitutionType institutionType,
-        String course,
-        GeneralStatus status
+        String course
         ) {
-
 }

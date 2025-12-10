@@ -1,7 +1,9 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.model.Permissions;
 import com.travel_system.backend_app.model.StudentTravel;
+import com.travel_system.backend_app.repository.PermissionsRepository;
 import com.travel_system.backend_app.repository.StudentRepository;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.model.Student;
@@ -14,6 +16,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -21,15 +24,16 @@ import java.util.UUID;
 
 @Service
 public class StudentService {
-    private StudentRepository repository;
-    private StudentTravelRepository studentTravelRepository;
-    private PasswordEncoder passwordEncoder;
+    private final StudentRepository repository;
+    private final StudentTravelRepository studentTravelRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final PermissionsRepository permissionsRepository;
 
-    @Autowired
-    public StudentService(StudentRepository repository, StudentTravelRepository studentTravelRepository, PasswordEncoder passwordEncoder) {
+    public StudentService(StudentRepository repository, StudentTravelRepository studentTravelRepository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository) {
         this.repository = repository;
         this.studentTravelRepository = studentTravelRepository;
         this.passwordEncoder = passwordEncoder;
+        this.permissionsRepository = permissionsRepository;
     }
 
     public List<StudentResponseDTO> getAllStudents() {
@@ -64,6 +68,14 @@ public class StudentService {
 
         if (email.isPresent()) throw new DuplicateResourceException("O email" + ", " + requestDTO.email() + ", " + "já existe");
         if (telephone.isPresent()) throw new DuplicateResourceException("O telefone" + ", " + requestDTO.telephone() + ", " + "já existe");
+
+        final String PERM = "ROLE_USER";
+        Permissions userPerm = permissionsRepository.findByDescription(PERM)
+                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + PERM + " não encontrada."));
+
+        newStudent.setPermissions(List.of(userPerm));
+        newStudent.setCreatedAt(LocalDateTime.now());
+        newStudent.setStatus(GeneralStatus.ACTIVE);
 
         Student savedStudent = repository.save(newStudent);
         return studentConverted(savedStudent);
@@ -100,9 +112,9 @@ public class StudentService {
         return studentConverted(savedStudent);
     }
 
-    public StudentResponseDTO getLoggedInStudentProfile(String email, String telephone) {
-        Student student = repository.findByEmailOrTelephone(email, telephone)
-                .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrato"));
+    public StudentResponseDTO getLoggedInStudentProfile(String email) {
+        Student student = repository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrato: " + email));
 
         return studentConverted(student);
     }
@@ -171,8 +183,7 @@ public class StudentService {
                 student.getTelephone(),
                 student.getCreatedAt(),
                 student.getInstitutionType(),
-                student.getCourse(),
-                student.getStatus()
+                student.getCourse()
         );
     }
 

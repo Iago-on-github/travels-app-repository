@@ -14,6 +14,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -64,6 +66,9 @@ public class DriverService {
         String rawPassword = newDriver.getPassword();
         newDriver.setPassword(passwordEncoder.encode(rawPassword));
 
+        newDriver.setCreatedAt(LocalDateTime.now());
+        newDriver.setStatus(GeneralStatus.ACTIVE);
+
         Driver savedDriver = repository.save(newDriver);
         return driverConverted(savedDriver);
     }
@@ -96,9 +101,9 @@ public class DriverService {
         return driverConverted(savedDriver);
     }
 
-    public DriverResponseDTO getLoggedInDriverProfile(String email, String telephone) {
-        Driver getDriverLoggedProfile = repository.findByEmailOrTelephone(email, telephone)
-                .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado. Email, telephone: " + email + ", " + telephone));
+    public DriverResponseDTO getLoggedInDriverProfile(String email) {
+        Driver getDriverLoggedProfile = repository.findByEmail(email)
+                .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado. Email: " + email));
         return driverConverted(getDriverLoggedProfile);
     }
 

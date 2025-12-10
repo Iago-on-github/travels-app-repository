@@ -10,6 +10,7 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "DRIVER_TABLE")
+@PrimaryKeyJoinColumn(name = "id")
 public class Driver extends UserModel {
     private String areaOfActivity;
     private Integer totalTrips;

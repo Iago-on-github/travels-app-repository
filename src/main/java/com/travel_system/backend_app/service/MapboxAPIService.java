@@ -20,11 +20,12 @@ public class MapboxAPIService implements MapboxAPICalling {
     @Value("${mapbox.access.token}")
     private String accessToken;
 
-    private WebClient webClient;
-    private TravelRepository travelRepository;
+    private final WebClient webClient;
+    private final TravelRepository travelRepository;
 
     @Autowired
-    public MapboxAPIService(TravelRepository travelRepository) {
+    public MapboxAPIService(WebClient webClient, TravelRepository travelRepository) {
+        this.webClient = webClient;
         this.travelRepository = travelRepository;
     }
 

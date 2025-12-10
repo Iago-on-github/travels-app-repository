@@ -28,10 +28,11 @@ public class SecurityConfig {
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/auth/signing").permitAll()
+                                .requestMatchers("/auth/refresh").permitAll()
                                 .requestMatchers("/admins/**").hasRole("ADMIN")
                                 .anyRequest().authenticated()
                 )
-                .cors(cors -> cors.configure(http))
+                .cors(AbstractHttpConfigurer::disable)
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
