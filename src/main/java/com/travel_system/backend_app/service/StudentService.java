@@ -133,20 +133,6 @@ public class StudentService {
 
     }
 
-    // haverá um popup no front que perguntará se o estudante irá participar da viagem
-    public void confirmEmbarkOnTravel(UUID studentId, UUID travelId) {
-        StudentTravel studentTravel = studentTravelRepository
-                .findByStudentIdAndTravelId(studentId, travelId)
-                .orElseThrow(() -> new TravelStudentAssociationNotFoundException("Associação travel e student não encontrada"));
-
-        if (studentTravel.isEmbark()) {
-            throw new BoardingAlreadyConfirmedException("Embarque já confirmado");
-        }
-
-        studentTravel.setEmbark(true);
-        studentTravelRepository.save(studentTravel);
-    }
-
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES

@@ -1,5 +1,6 @@
 package com.travel_system.backend_app.model;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import jakarta.persistence.*;
 
@@ -43,6 +44,7 @@ public class Driver extends UserModel {
         this.totalTrips = totalTrips;
     }
 
+    @JsonIgnore
     public List<Travel> getTravels() {
         return travels;
     }

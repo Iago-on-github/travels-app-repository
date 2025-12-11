@@ -57,15 +57,10 @@ public class StudentController {
         return ResponseEntity.ok().body(studentService.updateLoggedStudent(email, studentRequestDTO));
     }
 
-    @PutMapping("/{id}")
+    @PutMapping("/disable/{id}")
     public ResponseEntity<Void> disableStudent(@PathVariable UUID id) {
         studentService.disableStudent(id);
         return ResponseEntity.ok().build();
     }
 
-    @PostMapping("/confirmEmbark")
-    public ResponseEntity<Void> confirmStudentEmbark(@RequestParam UUID studentId, @RequestParam UUID travelId) {
-        studentService.confirmEmbarkOnTravel(studentId, travelId);
-        return ResponseEntity.ok().build();
-    }
 }

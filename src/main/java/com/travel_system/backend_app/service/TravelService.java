@@ -7,48 +7,51 @@ import com.travel_system.backend_app.model.dtos.response.TravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.TravelStatus;
-import com.travel_system.backend_app.repository.DriverRepository;
-import com.travel_system.backend_app.repository.StudentRepository;
-import com.travel_system.backend_app.repository.StudentTravelRepository;
-import com.travel_system.backend_app.repository.TravelRepository;
+import com.travel_system.backend_app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class TravelService {
 
-    private TravelRepository travelRepository;
-    private StudentTravelRepository studentTravelRepository;
-    private StudentRepository studentRepository;
-    private DriverRepository driverRepository;
-    private MapboxAPIService mapboxAPIService;
-    private RedisTrackingService redisTrackingService;
+    private final TravelRepository travelRepository;
+    private final StudentTravelRepository studentTravelRepository;
+    private final StudentRepository studentRepository;
+    private final DriverRepository driverRepository;
+    private final MapboxAPIService mapboxAPIService;
+    private final RedisTrackingService redisTrackingService;
+    private final PermissionsRepository permissionsRepository;
 
     @Autowired
-    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService) {
+    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, PermissionsRepository permissionsRepository) {
         this.travelRepository = travelRepository;
         this.studentTravelRepository = studentTravelRepository;
         this.studentRepository = studentRepository;
         this.driverRepository = driverRepository;
         this.mapboxAPIService = mapboxAPIService;
         this.redisTrackingService = redisTrackingService;
+        this.permissionsRepository = permissionsRepository;
     }
 
+    // FORMATAR O RETORNO DO DRIVER PARA NAO SALVAR O OBJ COMPLETO -
     @Transactional
     public TravelResponseDTO createTravel(TravelRequestDTO travelRequestDTO) {
         Travel travel = new Travel();
 
-        Driver driver = driverRepository.findById(travelRequestDTO.driverId()).orElseThrow(EntityNotFoundException::new);
+        Driver driver = driverRepository.findById(travelRequestDTO.driverId())
+                .orElseThrow(EntityNotFoundException::new);
 
         if (driver.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Motorista inativo. Não é possível prosseguir.");
 
         travel.setTravelStatus(TravelStatus.PENDING);
         travel.setDriver(driver);
+        travel.setStartHourTravel(Instant.now());
 
         travelRepository.save(travel);
 

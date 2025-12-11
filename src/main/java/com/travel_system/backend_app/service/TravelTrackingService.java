@@ -1,13 +1,13 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.RecalculateEtaException;
-import com.travel_system.backend_app.exceptions.TravelException;
-import com.travel_system.backend_app.exceptions.TripNotFound;
+import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDeviationDTO;
 import com.travel_system.backend_app.model.enums.TravelStatus;
+import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -23,16 +23,18 @@ public class TravelTrackingService {
     private RedisTrackingService redisTrackingService;
     private MapboxAPIService mapboxAPIService;
     private RouteCalculationService routeCalculationService;
+    private final StudentTravelRepository studentTravelRepository;
 
     // usar no lugar de Instant.now() para ajudar nos testes unitários
     private Clock clock;
 
     @Autowired
-    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, Clock clock) {
+    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, StudentTravelRepository studentTravelRepository, Clock clock) {
         this.travelRepository = travelRepository;
         this.redisTrackingService = redisTrackingService;
         this.mapboxAPIService = mapboxAPIService;
         this.routeCalculationService = routeCalculationService;
+        this.studentTravelRepository = studentTravelRepository;
         this.clock = clock;
     }
 
@@ -98,5 +100,19 @@ public class TravelTrackingService {
                 currentDistance.toString(),
                 travel.getTravelStatus().toString()
         );
+    }
+
+    // haverá um popup no front que perguntará se o estudante irá participar da viagem
+    public void confirmEmbarkOnTravel(UUID studentId, UUID travelId) {
+        StudentTravel studentTravel = studentTravelRepository
+                .findByStudentIdAndTravelId(studentId, travelId)
+                .orElseThrow(() -> new TravelStudentAssociationNotFoundException("Associação travel e student não encontrada"));
+
+        if (studentTravel.isEmbark()) {
+            throw new BoardingAlreadyConfirmedException("Embarque já confirmado");
+        }
+
+        studentTravel.setEmbark(true);
+        studentTravelRepository.save(studentTravel);
     }
 }
