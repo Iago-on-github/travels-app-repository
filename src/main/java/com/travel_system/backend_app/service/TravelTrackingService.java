@@ -135,20 +135,18 @@ public class TravelTrackingService {
         return new LiveLocationDTO(liveCoordinates.currentLatitude(), liveCoordinates.currentLongitude(), routeDetailsDTO.geometry(), routeDetailsDTO.distance());
     }
 
+    // MÉTODOS AUXILIARES
+
     private LiveCoordinates extractLiveCoordinates(UUID travelId) {
-        Map<String, String> currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
+        LiveLocationDTO currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
 
-        if (currentLocation.isEmpty()) {
-            throw new LiveLocationDataNotFoundException("Nenhum dado de rastreamento em tempo real encontrado para a viagem." + currentLocation);
-        }
-
-        if (!currentLocation.containsKey("lat") || !currentLocation.containsKey("lng")) {
-            throw new LiveLocationDataNotFoundException("Dados de longitude/latitude ausentes no rastreamento.");
+        if (currentLocation.latitude() == 0 || currentLocation.longitude() == 0) {
+            throw new LiveLocationDataNotFoundException("Dados de rastreamento em tempo real corrompidos ou não enviados.");
         }
 
         try {
-            double currentLatitude = Double.parseDouble(currentLocation.get("lat"));
-            double currentLongitude = Double.parseDouble(currentLocation.get("lng"));
+            double currentLatitude = currentLocation.latitude();
+            double currentLongitude = currentLocation.longitude();
 
             return new LiveCoordinates(currentLatitude, currentLongitude);
         } catch (Exception e) {
