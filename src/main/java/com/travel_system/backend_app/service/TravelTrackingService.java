@@ -1,32 +1,32 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
-import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
-import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
-import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDeviationDTO;
+import com.travel_system.backend_app.model.dtos.mapboxApi.*;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
-import java.time.Instant;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
 public class TravelTrackingService {
 
-    private TravelRepository travelRepository;
-    private RedisTrackingService redisTrackingService;
-    private MapboxAPIService mapboxAPIService;
-    private RouteCalculationService routeCalculationService;
+    private final TravelRepository travelRepository;
+    private final RedisTrackingService redisTrackingService;
+    private final MapboxAPIService mapboxAPIService;
+    private final RouteCalculationService routeCalculationService;
     private final StudentTravelRepository studentTravelRepository;
 
     // usar no lugar de Instant.now() para ajudar nos testes unitários
-    private Clock clock;
+    private final Clock clock;
 
     @Autowired
     public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, StudentTravelRepository studentTravelRepository, Clock clock) {
@@ -62,7 +62,11 @@ public class TravelTrackingService {
         try {
             // se está fora da rota, chama o metodo para recalcular a distância entre os pontos
             if (routeDeviation.isOffRoute()) {
-                newEtaRecalculateByApi = mapboxAPIService.recalculateETA(currentLng, currentLat, travel.getFinalLatitude(), travel.getFinalLongitude());
+                newEtaRecalculateByApi = mapboxAPIService.recalculateETA(
+                        currentLng,
+                        currentLat,
+                        travel.getFinalLongitude(),
+                        travel.getFinalLatitude());
 
                 currentDuration = newEtaRecalculateByApi.duration();
                 currentDistance = newEtaRecalculateByApi.distance();
@@ -114,5 +118,41 @@ public class TravelTrackingService {
 
         studentTravel.setEmbark(true);
         studentTravelRepository.save(studentTravel);
+    }
+
+    // endpoint de fastview - provê a loc do driver
+    public LiveLocationDTO getDriverPosition(UUID travelId) {
+        Travel travel = travelRepository.findById(travelId).orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
+
+        LiveCoordinates liveCoordinates = extractLiveCoordinates(travelId);
+
+        RouteDetailsDTO routeDetailsDTO = mapboxAPIService.calculateRoute(
+                liveCoordinates.currentLongitude(),
+                liveCoordinates.currentLatitude(),
+                travel.getFinalLongitude(),
+                travel.getFinalLatitude());
+
+        return new LiveLocationDTO(liveCoordinates.currentLatitude(), liveCoordinates.currentLongitude(), routeDetailsDTO.geometry(), routeDetailsDTO.distance());
+    }
+
+    private LiveCoordinates extractLiveCoordinates(UUID travelId) {
+        Map<String, String> currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
+
+        if (currentLocation.isEmpty()) {
+            throw new LiveLocationDataNotFoundException("Nenhum dado de rastreamento em tempo real encontrado para a viagem." + currentLocation);
+        }
+
+        if (!currentLocation.containsKey("lat") || !currentLocation.containsKey("lng")) {
+            throw new LiveLocationDataNotFoundException("Dados de longitude/latitude ausentes no rastreamento.");
+        }
+
+        try {
+            double currentLatitude = Double.parseDouble(currentLocation.get("lat"));
+            double currentLongitude = Double.parseDouble(currentLocation.get("lng"));
+
+            return new LiveCoordinates(currentLatitude, currentLongitude);
+        } catch (Exception e) {
+            throw new LiveLocationDataNotFoundException("Dados de rastreamento corrompidos ou inválidos: " + e.getMessage());
+        }
     }
 }

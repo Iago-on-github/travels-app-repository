@@ -18,13 +18,13 @@ public class TravelTrackingController {
         this.travelTrackingService = travelTrackingService;
     }
 
-    @GetMapping("/{travelId}")
-    public ResponseEntity<Void> processNewLocation(@PathVariable UUID travelId, @RequestParam Double currentLat, @RequestParam Double currentLng) {
-        travelTrackingService.processNewLocation(travelId, currentLat, currentLng);
+    @GetMapping("/{travelId}/location")
+    public ResponseEntity<Void> processNewLocation(@PathVariable UUID travelId, @RequestParam Double lat, @RequestParam Double lng) {
+        travelTrackingService.processNewLocation(travelId, lat, lng);
         return ResponseEntity.noContent().build();
     }
 
-    @PostMapping("/confirmEmbark")
+    @PostMapping("/confirmEmbark/{studentId}/{travelId}")
     public ResponseEntity<Void> confirmStudentEmbark(@PathVariable UUID studentId, @PathVariable UUID travelId) {
         travelTrackingService.confirmEmbarkOnTravel(studentId, travelId);
         return ResponseEntity.ok().build();

@@ -11,7 +11,7 @@ import java.util.UUID;
 public record TravelResponseDTO(
         UUID id,
         TravelStatus status,
-        Driver driver,
+        DriverResponseDTO driverResponseDTO,
         Set<StudentTravel> studentTravel,
         Instant startHourTravel,
         Instant endHourTravel

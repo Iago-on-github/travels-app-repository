@@ -54,6 +54,7 @@ public class RedisTrackingService {
 
         return new PreviousStateDTO(Double.parseDouble(durationRemaining), Double.parseDouble(distance), Long.parseLong(timeStampLastPing));
     }
+
     // fornece a loc mais recente e o timestamp para o front-end
     public Map<String, String> getLiveLocation(String travelId) {
         String key = HASH_KEY_PREFIX + travelId;

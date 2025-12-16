@@ -27,6 +27,7 @@ public class Travel {
     private Instant endHourTravel;
 
     // rota (estáticos)
+    @Column(columnDefinition = "text")
     private String polylineRoute;
     private Double duration;
     private Double distance;

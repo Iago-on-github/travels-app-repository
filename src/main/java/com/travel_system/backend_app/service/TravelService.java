@@ -3,6 +3,7 @@ package com.travel_system.backend_app.service;
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.request.TravelRequestDTO;
+import com.travel_system.backend_app.model.dtos.response.DriverResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.TravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
@@ -39,7 +40,6 @@ public class TravelService {
         this.permissionsRepository = permissionsRepository;
     }
 
-    // FORMATAR O RETORNO DO DRIVER PARA NAO SALVAR O OBJ COMPLETO -
     @Transactional
     public TravelResponseDTO createTravel(TravelRequestDTO travelRequestDTO) {
         Travel travel = new Travel();
@@ -48,6 +48,11 @@ public class TravelService {
                 .orElseThrow(EntityNotFoundException::new);
 
         if (driver.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Motorista inativo. Não é possível prosseguir.");
+
+        travel.setOriginLongitude(travelRequestDTO.originLongitude());
+        travel.setOriginLatitude(travelRequestDTO.originLatitude());
+        travel.setFinalLongitude(travelRequestDTO.finalLongitude());
+        travel.setFinalLatitude(travelRequestDTO.finalLatitude());
 
         travel.setTravelStatus(TravelStatus.PENDING);
         travel.setDriver(driver);
@@ -181,13 +186,26 @@ public class TravelService {
     }
 
     private TravelResponseDTO travelConverted(Travel travel) {
+        DriverResponseDTO driverResponseDTO = driverMapper(travel.getDriver());
         return new TravelResponseDTO(
                 travel.getId(),
                 travel.getTravelStatus(),
-                travel.getDriver(),
+                driverResponseDTO,
                 travel.getStudentTravels(),
                 travel.getStartHourTravel(),
                 travel.getEndHourTravel()
         );
+    }
+
+    private DriverResponseDTO driverMapper(Driver driver) {
+        return new DriverResponseDTO(
+                driver.getId(),
+                driver.getName(),
+                driver.getLastName(),
+                driver.getEmail(),
+                driver.getTelephone(),
+                driver.getCreatedAt(),
+                driver.getAreaOfActivity(),
+                driver.getTotalTrips());
     }
 }
