@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.*;
@@ -13,7 +12,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
-import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -96,7 +94,8 @@ public class TravelTrackingService {
                 travel.getId().toString(),
                 currentLat.toString(),
                 currentLng.toString(),
-                currentDuration.toString());
+                currentDuration.toString(),
+                currentPolyline);
 
         redisTrackingService.storeTravelMetadata(
                 travel.getId().toString(),
@@ -124,31 +123,66 @@ public class TravelTrackingService {
     public LiveLocationDTO getDriverPosition(UUID travelId) {
         Travel travel = travelRepository.findById(travelId).orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
 
-        LiveCoordinates liveCoordinates = extractLiveCoordinates(travelId);
+        LiveLocationDTO liveCoordinates = extractLiveCoordinates(travelId);
 
-        RouteDetailsDTO routeDetailsDTO = mapboxAPIService.calculateRoute(
-                liveCoordinates.currentLongitude(),
-                liveCoordinates.currentLatitude(),
-                travel.getFinalLongitude(),
-                travel.getFinalLatitude());
+        String geometry = liveCoordinates.geometry();
+        double distance = liveCoordinates.distance();
+        Double lastCalcLatitude = liveCoordinates.lastCalcLat();
+        Double lastCalcLongitude = liveCoordinates.lastCalcLng();
 
-        return new LiveLocationDTO(liveCoordinates.currentLatitude(), liveCoordinates.currentLongitude(), routeDetailsDTO.geometry(), routeDetailsDTO.distance());
+        RouteDeviationDTO isDeviation = routeCalculationService.isRouteDeviation(
+                liveCoordinates.lastCalcLat(),
+                liveCoordinates.lastCalcLng(),
+                geometry);
+
+        RouteDetailsDTO routeDetailsDTO;
+
+        if (geometry == null || isDeviation.isOffRoute()) {
+            routeDetailsDTO = mapboxAPIService.calculateRoute(
+                    liveCoordinates.longitude(),
+                    liveCoordinates.latitude(),
+                    travel.getFinalLongitude(),
+                    travel.getFinalLatitude());
+
+            geometry = routeDetailsDTO.geometry();
+            distance = routeDetailsDTO.distance();
+
+            lastCalcLatitude = liveCoordinates.latitude();
+            lastCalcLongitude = liveCoordinates.longitude();
+
+            redisTrackingService.storeLiveLocation(
+                    String.valueOf(travelId),
+                    String.valueOf(lastCalcLatitude),
+                    String.valueOf(lastCalcLongitude),
+                    String.valueOf(distance),
+                    geometry);
+        }
+
+        return new LiveLocationDTO(
+                liveCoordinates.latitude(),
+                liveCoordinates.longitude(),
+                geometry,
+                distance,
+                lastCalcLatitude,
+                lastCalcLongitude);
     }
 
     // MÉTODOS AUXILIARES
 
-    private LiveCoordinates extractLiveCoordinates(UUID travelId) {
+    private LiveLocationDTO extractLiveCoordinates(UUID travelId) {
         LiveLocationDTO currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
-
-        if (currentLocation.latitude() == 0 || currentLocation.longitude() == 0) {
-            throw new LiveLocationDataNotFoundException("Dados de rastreamento em tempo real corrompidos ou não enviados.");
-        }
 
         try {
             double currentLatitude = currentLocation.latitude();
             double currentLongitude = currentLocation.longitude();
 
-            return new LiveCoordinates(currentLatitude, currentLongitude);
+            return new LiveLocationDTO(
+                    currentLatitude,
+                    currentLongitude,
+                    currentLocation.geometry(),
+                    currentLocation.distance(),
+                    currentLocation.lastCalcLat(),
+                    currentLocation.lastCalcLng());
         } catch (Exception e) {
             throw new LiveLocationDataNotFoundException("Dados de rastreamento corrompidos ou inválidos: " + e.getMessage());
         }

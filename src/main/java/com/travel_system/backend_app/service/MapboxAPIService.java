@@ -86,6 +86,8 @@ public class MapboxAPIService implements MapboxAPICalling {
     }
 
     private RouteDetailsDTO RouteDetailsMapper(MapboxApiResponse mapboxApiResponse) {
+        System.out.println("DEBUGGING ROUTE: " + mapboxApiResponse.code());
+
         if (mapboxApiResponse.routes().isEmpty()) {
             throw new NoSuchCoordinates("Routes is empty.");
         }

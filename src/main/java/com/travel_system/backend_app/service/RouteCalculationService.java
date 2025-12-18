@@ -20,16 +20,14 @@ public class RouteCalculationService {
     }
 
     public RouteDeviationDTO isRouteDeviation(Double currentLat, Double currentLong, String polylineRoute) {
+
+        if (currentLat == null || currentLong == null || polylineRoute == null) {
+            return new RouteDeviationDTO(0.0, true, 0.0, 0.0);
+        }
+
         double minDistance = Double.MAX_VALUE;
         double projLng = 0;
         double projLat = 0;
-
-        if (currentLat == null || currentLong == null || polylineRoute == null) {
-            throw new NoSuchCoordinates("Coordenadas atuais não encontradas, "
-                    + "currentLat: " + currentLat
-                    + "currentLong: " + currentLong
-                    + "polylineRoute: " + polylineRoute);
-        }
 
         List<Point> decodePolyline = polylineService.formattedPolyline(polylineRoute);
         Point driverCurrentLoc = Point.fromLngLat(currentLong, currentLat);

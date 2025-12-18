@@ -27,19 +27,23 @@ public class RedisTrackingService {
     }
 
     // armazena a localização mais recente do motorista em cache com redisTemplate
-    public void storeLiveLocation(String travelId, String currentLat, String currentLng, String durationRemaining) {
+    public void storeLiveLocation(String travelId, String latitude, String longitude, String distance, String geometry) {
         String key = HASH_KEY_PREFIX + travelId;
 
         if (travelId == null) throw new TripNotFound("Id da viagem não encontrado " + travelId);
 
+        Map<String, String> data = new HashMap<>();
+
+        // dados cache
+        data.put("distance", distance);
+        data.put("geometry", geometry);
+
+        // ponto de referência de onde a rota foi calculada
+        data.put("last_calc_lat", latitude);
+        data.put("last_calc_lng", longitude);
+
         // obtem o timestamp real do servidor (ultimo ping)
         String currentTimeStamp = String.valueOf(Instant.now().toEpochMilli());
-
-        Map<String, String> data = new HashMap<>();
-        data.put("lat", currentLat);
-        data.put("lng", currentLng);
-        data.put("durationRemaining", durationRemaining);
-
         data.put("timestamp", currentTimeStamp);
 
         hashOperations.putAll(key, data);
@@ -70,14 +74,20 @@ public class RedisTrackingService {
             throw new TripNotFound("Dados de rastramento em tempo real não encontrados");
         }
 
+        // última posição
         String latitude = data.get("lat");
         String longitude = data.get("lng");
+
+        // dados de rota que ficarão em cache
         String geometry = data.get("geometry");
         String distance = data.get("distance");
 
-        // os dados do geometry e distance podem ser nulos pois não são tratados diretamente pelo Redis nesse caso
+        // posição do último cálculo da chamada da api
+        String lastCalcLat = data.get("last_calc_lat");
+        String lastCalcLng = data.get("last_calc_lng");
+
         if (latitude == null || longitude == null) {
-            throw new NoSuchCoordinates("Dados de rastreamento incompletos ou nulos.");
+            throw new NoSuchCoordinates("Latitude/Longitude atuais não encontradas");
         }
 
         try {
@@ -85,7 +95,9 @@ public class RedisTrackingService {
                     Double.parseDouble(latitude),
                     Double.parseDouble(longitude),
                     geometry,
-                    Double.parseDouble(distance));
+                    distance != null ? Double.parseDouble(distance) : 0.0,
+                    lastCalcLat != null ? Double.parseDouble(lastCalcLat) : null,
+                    lastCalcLng != null ? Double.parseDouble(lastCalcLng) : null);
         } catch (NumberFormatException e) {
             throw new NoSuchCoordinates("Dados de coordenadas corrompidos ou inválidos. " + e.getMessage());
         }
