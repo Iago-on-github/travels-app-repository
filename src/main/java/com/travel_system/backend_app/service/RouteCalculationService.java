@@ -19,6 +19,7 @@ public class RouteCalculationService {
         this.polylineService = polylineService;
     }
 
+    // verifica se a rota foi desviada da rota padrão - tolerância de 50 metros
     public RouteDeviationDTO isRouteDeviation(Double currentLat, Double currentLong, String polylineRoute) {
 
         if (currentLat == null || currentLong == null || polylineRoute == null) {
