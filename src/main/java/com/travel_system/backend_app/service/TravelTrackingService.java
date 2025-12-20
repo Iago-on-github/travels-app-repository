@@ -1,5 +1,6 @@
 package com.travel_system.backend_app.service;
 
+import com.mapbox.geojson.Point;
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
@@ -123,6 +124,10 @@ public class TravelTrackingService {
     public LiveLocationDTO getDriverPosition(UUID travelId) {
         Travel travel = travelRepository.findById(travelId).orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
 
+        if (!(travel.getTravelStatus() == TravelStatus.TRAVELLING)) {
+            throw new TravelException("Viagem " + travelId + " não está em andamento.");
+        }
+
         LiveLocationDTO liveCoordinates = extractLiveCoordinates(travelId);
 
         String geometry = liveCoordinates.geometry();
@@ -167,7 +172,19 @@ public class TravelTrackingService {
                 lastCalcLongitude);
     }
 
+    // envia uma notificação informando a distância resntante do ônibus ao usuário
+//    public proximityAlertResponseDto checkProximityAlert(Double userLatitude, Double userLongitude) {
+//
+//    }
+
     // MÉTODOS AUXILIARES
+
+    private LiveCoordinates getStudentPosition(UUID studentId) {
+        StudentTravel student = studentTravelRepository.findById(studentId)
+                .orElseThrow(() -> new EntityNotFoundException("Estudante não vinculado à viagem " + studentId));
+
+        return null;
+    }
 
     private LiveLocationDTO extractLiveCoordinates(UUID travelId) {
         LiveLocationDTO currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
