@@ -1,24 +1,87 @@
 package com.travel_system.backend_app.service;
 
+
 import com.travel_system.backend_app.exceptions.NoSuchCoordinates;
+import com.travel_system.backend_app.model.GeoPosition;
+import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveCoordinates;
-import org.springframework.data.geo.Point;
+import com.travel_system.backend_app.repository.GeoPositionRepository;
+import com.travel_system.backend_app.repository.StudentTravelRepository;
+import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
+import java.util.UUID;
 
 @Service
 public class LocationService {
 
-    public LiveCoordinates processLocation(LiveCoordinates liveCoordinates) {
-        if (liveCoordinates.latitude() == null || liveCoordinates.longitude() == null) {
-            throw new NoSuchCoordinates("Coordenadas lat/lng corrompidas ou não enviadas.");
+    private final GeoPositionRepository geoPositionRepository;
+    private final StudentTravelRepository studentTravelRepository;
+    private final RouteCalculationService routeCalculationService;
+
+    private final Double DISPLACEMENT_METERS_TOLERANCE = 3.0;
+
+    public LocationService(GeoPositionRepository geoPositionRepository, StudentTravelRepository studentTravelRepository, RouteCalculationService routeCalculationService) {
+        this.geoPositionRepository = geoPositionRepository;
+        this.studentTravelRepository = studentTravelRepository;
+        this.routeCalculationService = routeCalculationService;
+    }
+
+    @Transactional
+    public void updateStudentPosition(UUID studentTravelId, LiveCoordinates coordinates) {
+        if (coordinates.latitude() == null || coordinates.longitude() == null) {
+            throw new NoSuchCoordinates("Dados de Latitude/Longitude são nulos ou inválidos.");
         }
 
-        if (liveCoordinates.latitude() < -90 || liveCoordinates.latitude() > 90 ||
-                liveCoordinates.longitude() < -180 || liveCoordinates.longitude() > 180) {
-            throw new NoSuchCoordinates("Valores de latitude ou longitude fora do intervalo válido.");
+        applyStudentPositionUpdate(studentTravelId, coordinates);
+    }
+
+    private Boolean applyStudentPositionUpdate(UUID studentTravelId, LiveCoordinates actually) {
+        StudentTravel studentTravel = studentTravelRepository.findById(studentTravelId)
+                .orElseThrow(() -> new EntityNotFoundException("Entidade StudentTravel não encontrada: " + studentTravelId));
+
+        GeoPosition anterior = studentTravel.getPosition();
+
+        if (anterior == null) {
+            GeoPosition newPosition = new GeoPosition();
+
+            newPosition.setLatitude(actually.latitude());
+            newPosition.setLongitude(actually.longitude());
+            newPosition.setTimeStamp(Instant.now());
+            newPosition.setStudentTravel(studentTravel);
+
+            studentTravel.setPosition(newPosition);
+
+            geoPositionRepository.save(newPosition);
+
+            return false;
         }
 
-        Point point = new Point(liveCoordinates.latitude(), liveCoordinates.longitude());
-        return null;
+        // retorna se há deslocamento
+        Boolean displacementDetected = isStudentDisplacement(anterior, actually);
+
+        if (displacementDetected) {
+            anterior.setLatitude(actually.latitude());
+            anterior.setLongitude(actually.longitude());
+            anterior.setTimeStamp(Instant.now());
+
+            studentTravel.setPosition(anterior);
+
+            return true;
+        }
+
+        return false;
+    }
+
+    private Boolean isStudentDisplacement(GeoPosition anteriorPosition, LiveCoordinates actuallyPosition) {
+        Double calculateHaversineDistance = routeCalculationService.calculateHaversineDistanceInMeters(
+                actuallyPosition.longitude(),
+                actuallyPosition.latitude(),
+                anteriorPosition.getLatitude(),
+                anteriorPosition.getLongitude());
+
+        return calculateHaversineDistance > DISPLACEMENT_METERS_TOLERANCE;
     }
 }

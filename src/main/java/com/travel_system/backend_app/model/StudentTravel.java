@@ -20,17 +20,20 @@ public class StudentTravel {
     private boolean embark = false;
     private Instant embarkHour;
     private Instant disembarkHour;
+    @OneToOne
+    private GeoPosition position;
 
     public StudentTravel() {
     }
 
-    public StudentTravel(UUID id, Travel travel, Student student, boolean embark, Instant embarkHour, Instant disembarkHour) {
+    public StudentTravel(UUID id, Travel travel, Student student, boolean embark, Instant embarkHour, Instant disembarkHour, GeoPosition position) {
         this.id = id;
         this.travel = travel;
         this.student = student;
         this.embark = embark;
         this.embarkHour = embarkHour;
         this.disembarkHour = disembarkHour;
+        this.position = position;
     }
 
     public UUID getId() {
@@ -79,5 +82,13 @@ public class StudentTravel {
 
     public void setDisembarkHour(Instant disembarkHour) {
         this.disembarkHour = disembarkHour;
+    }
+
+    public GeoPosition getPosition() {
+        return position;
+    }
+
+    public void setPosition(GeoPosition position) {
+        this.position = position;
     }
 }
