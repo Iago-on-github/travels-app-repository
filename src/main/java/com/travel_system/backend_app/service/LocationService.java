@@ -1,6 +1,5 @@
 package com.travel_system.backend_app.service;
 
-
 import com.travel_system.backend_app.exceptions.NoSuchCoordinates;
 import com.travel_system.backend_app.model.GeoPosition;
 import com.travel_system.backend_app.model.StudentTravel;

@@ -4,6 +4,8 @@ import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.request.TravelRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.DriverResponseDTO;
+import com.travel_system.backend_app.model.dtos.response.StudentResponseDTO;
+import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.TravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
@@ -16,7 +18,9 @@ import org.springframework.stereotype.Service;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class TravelService {
@@ -154,9 +158,30 @@ public class TravelService {
         deactivateStudentLink(trip, studentId);
     }
 
+    public Set<StudentTravelResponseDTO> linkedStudentTravel(UUID travelId) {
+        Travel travel = travelRepository.findById(travelId)
+                .orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
+
+        Set<StudentTravel> linkedStudents = travel.getStudentTravels();
+
+        if (linkedStudents == null) throw new StudentNotLinkedToTripException("Nenhum estudante vincualado à viagem");
+
+        return linkedStudents.stream().map(this::studentTravelMapper).collect(Collectors.toSet());
+    }
+
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
+
+    private StudentTravelResponseDTO studentTravelMapper(StudentTravel studentTravel) {
+        return new StudentTravelResponseDTO(
+                studentTravel.getId(),
+                studentTravel.getTravel().getId(),
+                studentTravel.getStudent().getId(),
+                studentTravel.getEmbarkHour(),
+                studentTravel.getDisembarkHour(),
+                studentTravel.getPosition());
+    }
 
     private void persistStudentLink(Travel actualTrip, UUID studentId) {
         StudentTravel studentTravel = new StudentTravel();

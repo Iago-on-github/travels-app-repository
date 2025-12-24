@@ -172,19 +172,7 @@ public class TravelTrackingService {
                 lastCalcLongitude);
     }
 
-    // envia uma notificação informando a distância resntante do ônibus ao usuário
-//    public proximityAlertResponseDto checkProximityAlert(Double userLatitude, Double userLongitude) {
-//
-//    }
-
     // MÉTODOS AUXILIARES
-
-    private LiveCoordinates getStudentPosition(UUID studentId) {
-        StudentTravel student = studentTravelRepository.findById(studentId)
-                .orElseThrow(() -> new EntityNotFoundException("Estudante não vinculado à viagem " + studentId));
-
-        return null;
-    }
 
     private LiveLocationDTO extractLiveCoordinates(UUID travelId) {
         LiveLocationDTO currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
