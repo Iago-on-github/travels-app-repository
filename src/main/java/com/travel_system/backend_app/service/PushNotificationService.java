@@ -4,8 +4,10 @@ import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
 import org.springframework.stereotype.Service;
 
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class PushNotificationService {
@@ -24,23 +26,21 @@ public class PushNotificationService {
         this.routeCalculationService = routeCalculationService;
     }
 
-    // será o orquestrador
+    // será o orchestrator
     public void checkProximityAlerts(UUID travelId ) {
-        LiveLocationDTO driverPosition = travelTrackingService.getDriverPosition(travelId);
 
     }
 
-    private Boolean thresholdLimits(UUID travelId, LiveLocationDTO driverPosition) {
+    // fazer o método checkProximityAlerts com os dados do redis
+    protected Map<UUID, Double> distanceBetweenPositions(UUID travelId, LiveLocationDTO driverPosition) {
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
 
-        linkedStudentTravel.forEach(student -> {
-            Double distanceInMeters = routeCalculationService.calculateHaversineDistanceInMeters(
-                    driverPosition.longitude(),
-                    driverPosition.latitude(),
-                    student.position().getLongitude(),
-                    student.position().getLatitude());
-
-        });
-        return false;
+        return linkedStudentTravel.stream()
+                .collect(Collectors.toMap(StudentTravelResponseDTO::studentId,
+                        student -> routeCalculationService.calculateHaversineDistanceInMeters(
+                                driverPosition.longitude(),
+                                driverPosition.latitude(),
+                                student.position().getLongitude(),
+                                student.position().getLatitude())));
     }
 }
