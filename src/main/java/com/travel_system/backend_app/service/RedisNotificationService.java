@@ -43,6 +43,9 @@ public class RedisNotificationService {
         String currentZone;
         double step;
 
+        long timeToNotify = 720000L;
+        long elapsedTime = Instant.now().toEpochMilli() - Integer.parseInt(state.lastNotificationAt());
+
         if (currentDistanceMeters >= 1000) {
             currentZone = "FAR";
             step = 200.0;
@@ -55,8 +58,13 @@ public class RedisNotificationService {
             return true;
         }
 
+        // evita spam de notificação caso o onibus fique mt tempo parado (12 min)
+        if (elapsedTime >= timeToNotify) {
+            return true;
+        }
+
         double lastDistanceNotified = Double.parseDouble(state.lastDistanceNotified());
-        double distanceDelta = Math.abs(lastDistanceNotified = currentDistanceMeters);
+        double distanceDelta = Math.abs(lastDistanceNotified - currentDistanceMeters);
 
         return distanceDelta >= step;
     }
