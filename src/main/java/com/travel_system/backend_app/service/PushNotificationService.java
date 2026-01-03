@@ -1,13 +1,18 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.model.GeoPosition;
+import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.response.DistanceResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.NotificationStateDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
+import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -21,12 +26,14 @@ public class PushNotificationService {
     private final TravelService travelService;
     private final RouteCalculationService routeCalculationService;
     private final RedisNotificationService redisNotificationService;
+    private final RabbitMQProducer rabbitMQProducer;
 
-    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService) {
+    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer) {
         this.travelTrackingService = travelTrackingService;
         this.travelService = travelService;
         this.routeCalculationService = routeCalculationService;
         this.redisNotificationService = redisNotificationService;
+        this.rabbitMQProducer = rabbitMQProducer;
     }
 
     // será o orchestrator
@@ -44,6 +51,7 @@ public class PushNotificationService {
             Double distance = distances.get(student.studentId());
             String zone = distance >= 1000 ? "FAR" : "NEAR";
             String lastNotificationAt = String.valueOf(Instant.now().toEpochMilli());
+            String timestamp = String.valueOf(Instant.now());
 
             Boolean shouldPushNotification = redisNotificationService.verifyNotificationState(
                     travelId,
@@ -51,16 +59,43 @@ public class PushNotificationService {
                     distance,
                     readNotificationState);
 
+            String alertType = "";
+
+            // seta o alertyType
+            if (!zone.equals(readNotificationState.zone())) {
+                alertType = "ZONE_CHANGED";
+            } else {
+                long elapsedMinutes = Instant.parse(lastNotificationAt).toEpochMilli()
+                        - Instant.parse(readNotificationState.lastNotificationAt()).toEpochMilli();
+
+                if (elapsedMinutes >= 720000) {
+                    alertType = "TIME_ELAPSED";
+                } else {
+                    double lastDistance = Double.parseDouble(readNotificationState.lastDistanceNotified());
+                    double deltaDistance = Math.abs(distance - lastDistance);
+
+                    double step = zone.equals("FAR") ? 200.0 : 30.0;
+                    if (deltaDistance >= step) {
+                        alertType = "DISTANCE_STEP_REACHED";
+                    }
+                }
+            }
+
             if (shouldPushNotification) {
-                // disparara evento
-                redisNotificationService.updateNotificationState(travelId, student.studentId(), new NotificationStateDTO(
-                        zone,
+                // manda evento ao rabbitMQ
+                rabbitMQProducer.sendMessage(new SendPackageDataToRabbitMQ(
+                        travelId,
+                        student.studentId(),
+                        distance, zone,
+                        timestamp,
+                        alertType));
+
+                // update no redis
+                redisNotificationService.updateNotificationState(travelId, student.studentId(),
+                        new NotificationStateDTO(zone,
                         distance.toString(),
                         lastNotificationAt,
-                        String.valueOf(Instant.now())
-                        ));
-                // verificar o método verify do redis, para ver se ele salvaŕa a parte do NEAR e FAR
-                // realizar a orquestração com RabbitMQ
+                        timestamp));
             }
         });
 

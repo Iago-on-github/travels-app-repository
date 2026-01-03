@@ -5,6 +5,7 @@ import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.response.NotificationStateDTO;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.redis.core.HashOperations;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -14,12 +15,14 @@ import java.util.UUID;
 
 @Service
 public class RedisNotificationService {
+    private final RedisTemplate<String, Object> redisTemplate;
     private final HashOperations<String, String, String> hashOperations;
 
     private final String HASH_KEY_PREFIX = "notification:";
 
-    public RedisNotificationService(HashOperations<String, String, String> hashOperations) {
-        this.hashOperations = hashOperations;
+    public RedisNotificationService(RedisTemplate<String, Object> redisTemplate) {
+        this.redisTemplate = redisTemplate;
+        this.hashOperations = redisTemplate.opsForHash();
     }
 
     // read
@@ -40,6 +43,11 @@ public class RedisNotificationService {
     public Boolean verifyNotificationState(UUID travelId, UUID studentId, Double currentDistanceMeters, NotificationStateDTO state) {
         if (state == null || state.zone().isEmpty()) return true;
 
+        // se nao hoyver ultima notificação confiável, notifica
+        if (state.lastNotificationAt() == null || state.lastNotificationAt().isEmpty() || state.lastNotificationAt().isBlank()) {
+            return true;
+        }
+
         String currentZone;
         double step;
 
@@ -58,15 +66,13 @@ public class RedisNotificationService {
             return true;
         }
 
-        // evita spam de notificação caso o onibus fique mt tempo parado (12 min)
-        if (elapsedTime >= timeToNotify) {
-            return true;
-        }
-
         double lastDistanceNotified = Double.parseDouble(state.lastDistanceNotified());
         double distanceDelta = Math.abs(lastDistanceNotified - currentDistanceMeters);
 
-        return distanceDelta >= step;
+        if (distanceDelta >= step) return true;
+
+        // evita spam de notificação caso o onibus fique mt tempo parado (12 min)
+        return elapsedTime >= timeToNotify;
     }
 
     // update
