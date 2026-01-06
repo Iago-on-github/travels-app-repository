@@ -1,11 +1,16 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.exceptions.TravelException;
+import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.GeoPosition;
+import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
+import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.response.DistanceResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.NotificationStateDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
+import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.springframework.stereotype.Service;
 
@@ -27,16 +32,23 @@ public class PushNotificationService {
     private final RouteCalculationService routeCalculationService;
     private final RedisNotificationService redisNotificationService;
     private final RabbitMQProducer rabbitMQProducer;
+    private final RedisTrackingService redisTrackingService;
+    private final TravelRepository travelRepository;
 
-    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer) {
+    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer, RedisTrackingService redisTrackingService, TravelRepository travelRepository) {
         this.travelTrackingService = travelTrackingService;
         this.travelService = travelService;
         this.routeCalculationService = routeCalculationService;
         this.redisNotificationService = redisNotificationService;
         this.rabbitMQProducer = rabbitMQProducer;
+        this.redisTrackingService = redisTrackingService;
+        this.travelRepository = travelRepository;
     }
 
-    // será o orchestrator
+    /*
+    gera pushs de notificações por distância <aluno - ônibus>
+    ex.: Ônibus está há 200M de você
+    */
     public void checkProximityAlerts(UUID travelId ) {
         LiveLocationDTO driverPosition = travelTrackingService.getDriverPosition(travelId);
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
@@ -86,7 +98,8 @@ public class PushNotificationService {
                 rabbitMQProducer.sendMessage(new SendPackageDataToRabbitMQ(
                         travelId,
                         student.studentId(),
-                        distance, zone,
+                        distance,
+                        zone,
                         timestamp,
                         alertType));
 
@@ -98,6 +111,36 @@ public class PushNotificationService {
                         timestamp));
             }
         });
+
+    }
+
+    /*
+    gera pushs de notificações por anomalias (detector de problemas) <aluno - ônibus>
+    ex.: Ônibus está há 12 minutos parado
+    */
+    public void averageVelocityAlert(UUID travelId) {
+        Travel travel = travelRepository.findById(travelId)
+                .orElseThrow(() -> new TripNotFound("Viagem não encontrada. " + travelId));
+
+        LiveLocationDTO actuallyPosition = redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
+
+        redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
+
+        // reading necessary redis state
+        var lastDriverPing = actuallyPosition;
+        PreviousStateDTO lastPing = redisTrackingService.getPreviousEta(String.valueOf(travel.getId()));
+
+        // first ping - state does not exist
+        if (lastPing == null) {
+            redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
+            return;
+        }
+
+        Duration timeElapsed = Duration.between(Instant.ofEpochMilli(lastPing.timeStamp()), Instant.now());
+        if (timeElapsed.toSeconds() >= 5) {
+            // distance between two pings
+
+        }
 
     }
 

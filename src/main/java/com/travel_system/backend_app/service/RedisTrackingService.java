@@ -2,9 +2,15 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.NoSuchCoordinates;
 import com.travel_system.backend_app.exceptions.TripNotFound;
+import com.travel_system.backend_app.model.Driver;
+import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
+import com.travel_system.backend_app.model.dtos.response.LastLocationDTO;
+import com.travel_system.backend_app.repository.DriverRepository;
+import com.travel_system.backend_app.repository.TravelRepository;
+import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -12,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 
 @Service
@@ -19,11 +27,13 @@ public class RedisTrackingService {
 
     private final RedisTemplate<String, Object> redisTemplate;
     private final HashOperations<String, String, String> hashOperations;
+    private final TravelRepository travelRepository;
     private final String HASH_KEY_PREFIX = "travelId:";
 
-    public RedisTrackingService(RedisTemplate<String, Object> redisTemplate) {
+    public RedisTrackingService(RedisTemplate<String, Object> redisTemplate, TravelRepository travelRepository) {
         this.redisTemplate = redisTemplate;
         this.hashOperations = redisTemplate.opsForHash();
+        this.travelRepository = travelRepository;
     }
 
     // armazena a localização mais recente do motorista em cache com redisTemplate
@@ -103,6 +113,23 @@ public class RedisTrackingService {
         }
     }
 
+    // fornece a última loc registrada (antes da loc mais recente)
+    public LastLocationDTO getLastLocation(UUID travelId) {
+        Travel travel = travelRepository.findById(travelId)
+                .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
+
+        String key = HASH_KEY_PREFIX + travel.getId();
+
+//        hashOperations.get(key, )
+
+        /* next steps:
+            Ler o hash do Redis
+            Verificar se existe estado (primeiro ping?)
+            Converter para um DTO de estado anterior
+            Retornar esse DTO (ou null se não existir
+        */
+    }
+
     // atualiza ETA restante, distância restante e o status atualizado
     public void storeTravelMetadata(String travelId, String durationRemaining, String distance, String status) {
         String key = HASH_KEY_PREFIX + travelId;
@@ -123,5 +150,37 @@ public class RedisTrackingService {
         if (travelId == null) throw new TripNotFound("Id da viagem não encontrado " + travelId);
 
         redisTemplate.delete(key);
+    }
+
+    // mantém memória entre os pings do driver
+    public void keepMemoryBetweenDriverPings(UUID travelId, LiveLocationDTO driverPosition) {
+        Travel travel = travelRepository.findById(travelId)
+                .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
+        String now = String.valueOf(Instant.now());
+
+        String key = HASH_KEY_PREFIX + travel.getId();
+
+        Map<String, String> data = hashOperations.entries(key);
+
+        // read stats
+        String lastPingTimestamp = data.get("last_ping_timestamp");
+
+//        String lastPingLat = data.get("last_ping_lat");
+//        String lastPingLng = data.get("last_ping_lng");
+//        String lastTrafficAlertTimestamp = data.get("last_traffic_alert_timestamp");
+//        String lastAvgSpeed = data.get("last_avg_speed");
+
+        // if without state
+        if (lastPingTimestamp == null) {
+            data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
+            data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
+            data.put("last_ping_timestamp", now);
+            data.put("last_traffic_alert_timestamp", now);
+            data.put("last_avg_speed", "0");
+        } else {
+            data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
+            data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
+            data.put("last_ping_timestamp", now);
+        }
     }
 }
