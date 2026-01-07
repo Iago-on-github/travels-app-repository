@@ -8,6 +8,7 @@ import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.response.DistanceResponseDTO;
+import com.travel_system.backend_app.model.dtos.response.LastLocationDTO;
 import com.travel_system.backend_app.model.dtos.response.NotificationStateDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
 import com.travel_system.backend_app.repository.TravelRepository;
@@ -122,12 +123,10 @@ public class PushNotificationService {
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new TripNotFound("Viagem não encontrada. " + travelId));
 
+
         LiveLocationDTO actuallyPosition = redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
 
-        redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
-
         // reading necessary redis state
-        var lastDriverPing = actuallyPosition;
         PreviousStateDTO lastPing = redisTrackingService.getPreviousEta(String.valueOf(travel.getId()));
 
         // first ping - state does not exist
@@ -138,10 +137,38 @@ public class PushNotificationService {
 
         Duration timeElapsed = Duration.between(Instant.ofEpochMilli(lastPing.timeStamp()), Instant.now());
         if (timeElapsed.toSeconds() >= 5) {
-            // distance between two pings
+            LastLocationDTO lastLocation = redisTrackingService.getLastLocation(travel.getId());
+
+            if (lastLocation == null) {
+                redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
+                return;
+            }
+
+            Double distanceBetweenPings = routeCalculationService.calculateHaversineDistanceInMeters(actuallyPosition.longitude(),
+                    actuallyPosition.latitude(),
+                    lastLocation.longitude(),
+                    lastLocation.latitude());
+
+            if (!timeElapsed.isZero()) {
+                var distanceRemaining = lastPing.distanceRemaining();
+
+                var avgSpeed = distanceBetweenPings / timeElapsed.toSeconds();
+
+                var newETA = distanceRemaining / avgSpeed;
+
+                redisTrackingService.updateTripEtaState(travel.getId(), distanceRemaining, newETA, Instant.now());
+            }
 
         }
 
+        redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
+
+        /* PONTOS DE AJUSTES
+        * Ordem das operações (ler → calcular → salvar)
+        Padrão de timestamp
+        Evitar múltiplas leituras do Redis
+        Preparar terreno para regras de anomalia
+* */
     }
 
     // distance between driver and student

@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.NoSuchCoordinates;
-import com.travel_system.backend_app.exceptions.TripNotFound;
+import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
@@ -45,7 +44,7 @@ public class RedisTrackingService {
         Map<String, String> data = new HashMap<>();
 
         // dados cache
-        data.put("distance", distance);
+        data.put("distanceRemaining", distance);
         data.put("geometry", geometry);
 
         // ponto de referência de onde a rota foi calculada
@@ -61,15 +60,21 @@ public class RedisTrackingService {
 
     // retorna o último ETA armazenado + a distância
     public PreviousStateDTO getPreviousEta(String travelId) {
-        String key = HASH_KEY_PREFIX + travelId;
+        Travel travel = travelRepository.findById(UUID.fromString(travelId))
+                .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
 
-        if (travelId == null) throw new TripNotFound("Id da viagem não encontrado " + travelId);
+        String key = HASH_KEY_PREFIX + travel.getId();
+
+        if (travel.getId() == null) throw new TripNotFound("Id da viagem não encontrado " + travel.getId());
 
         String durationRemaining = hashOperations.get(key, "durationRemaining");
-        String distance = hashOperations.get(key, "distance");
-        String timeStampLastPing = hashOperations.get(key, "timestamp");
+        String distance = hashOperations.get(key, "distanceRemaining");
+        String timestampLastPing = hashOperations.get(key, "timestamp");
 
-        return new PreviousStateDTO(Double.parseDouble(durationRemaining), Double.parseDouble(distance), Long.parseLong(timeStampLastPing));
+        return new PreviousStateDTO(
+                durationRemaining != null ? Double.parseDouble(durationRemaining) : null,
+                distance != null ? Double.parseDouble(distance) : null,
+                timestampLastPing != null ? Long.parseLong(timestampLastPing) : null);
     }
 
     // fornece a loc mais recente e o timestamp para o front-end
@@ -120,14 +125,25 @@ public class RedisTrackingService {
 
         String key = HASH_KEY_PREFIX + travel.getId();
 
-//        hashOperations.get(key, )
+        // read hash
+        String lastPingLat = hashOperations.get(key, "last_ping_lat");
+        String lastPingLng = hashOperations.get(key, "last_ping_lng");
+        String timestamp = hashOperations.get(key, "timestamp");
 
-        /* next steps:
-            Ler o hash do Redis
-            Verificar se existe estado (primeiro ping?)
-            Converter para um DTO de estado anterior
-            Retornar esse DTO (ou null se não existir
-        */
+        // is first ping return null. Who calling this method decided create an initial state
+        if (timestamp == null) return null;
+        else {
+            if (lastPingLat == null || lastPingLng == null || timestamp.isEmpty()) {
+                throw new NoFoundPositionException("Últimos dados de latitude, longitude ou timestamp inválidos ou corrompidos");
+            }
+
+            double LastPingLatToDouble = Double.parseDouble(lastPingLat);
+            double LastPingLngToDouble = Double.parseDouble(lastPingLng);
+            long timestampToLong = Long.parseLong(timestamp);
+
+            return new LastLocationDTO(LastPingLatToDouble, LastPingLngToDouble, timestampToLong);
+
+        }
     }
 
     // atualiza ETA restante, distância restante e o status atualizado
@@ -139,7 +155,7 @@ public class RedisTrackingService {
         // HSET: vai atualizar os campos de distance, eta e status sem afetar LAT/LNG
         hashOperations.put(key, "durationRemaining", durationRemaining);
         hashOperations.put(key, "timestamp", String.valueOf(Instant.now().toEpochMilli()));
-        hashOperations.put(key, "distance", distance);
+        hashOperations.put(key, "distanceRemaining", distance);
         hashOperations.put(key, "status", status);
     }
 
@@ -163,24 +179,45 @@ public class RedisTrackingService {
         Map<String, String> data = hashOperations.entries(key);
 
         // read stats
-        String lastPingTimestamp = data.get("last_ping_timestamp");
+        String lastPingTimestamp = data.get("timestamp");
 
 //        String lastPingLat = data.get("last_ping_lat");
 //        String lastPingLng = data.get("last_ping_lng");
-//        String lastTrafficAlertTimestamp = data.get("last_traffic_alert_timestamp");
-//        String lastAvgSpeed = data.get("last_avg_speed");
 
         // if without state
         if (lastPingTimestamp == null) {
             data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
             data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
-            data.put("last_ping_timestamp", now);
-            data.put("last_traffic_alert_timestamp", now);
-            data.put("last_avg_speed", "0");
+            data.put("timestamp", now);
+
+            hashOperations.putAll(key, data);
         } else {
             data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
             data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
-            data.put("last_ping_timestamp", now);
+            data.put("timestamp", now);
+
+            hashOperations.putAll(key, data);
         }
+    }
+
+    // atualiza o estado de ETA da viagem
+    public void updateTripEtaState(UUID travelId, Double distanceRemaining, Double durationRemaining, Instant timestamp) {
+        if (travelId == null || distanceRemaining == null || durationRemaining == null || timestamp == null) {
+            throw new EtaDataStatesInvalidException("Dados do estado ETA inválidos ou corrompidos");
+        }
+
+        String distanceRemainingString = String.valueOf(distanceRemaining);
+        String durationRemainingToString = String.valueOf(durationRemaining);
+        String timestampToString = String.valueOf(timestamp);
+
+        String key = HASH_KEY_PREFIX + travelId;
+
+        Map<String, String> data = new HashMap<>();
+
+        data.put("distanceRemaining", distanceRemainingString);
+        data.put("durationRemaining", durationRemainingToString);
+        data.put("timestamp", timestampToString);
+
+        hashOperations.putAll(key, data);
     }
 }

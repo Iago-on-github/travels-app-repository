@@ -4,7 +4,5 @@ import java.time.Instant;
 
 public record LastLocationDTO(double latitude,
                               double longitude,
-                              Instant timestamp,
-                              double avgSpeed,
-                              Instant lastTrafficAlertTimestamp) {
+                              long timestamp) {
 }
