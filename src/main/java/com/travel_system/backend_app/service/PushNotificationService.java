@@ -5,12 +5,14 @@ import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.GeoPosition;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
+import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.response.DistanceResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.LastLocationDTO;
 import com.travel_system.backend_app.model.dtos.response.NotificationStateDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
+import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.springframework.stereotype.Service;
@@ -50,7 +52,7 @@ public class PushNotificationService {
     gera pushs de notificações por distância <aluno - ônibus>
     ex.: Ônibus está há 200M de você
     */
-    public void checkProximityAlerts(UUID travelId ) {
+    public void checkProximityAlerts(UUID travelId) {
         LiveLocationDTO driverPosition = travelTrackingService.getDriverPosition(travelId);
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
         List<DistanceResponseDTO> differencePosition = distanceBetweenPositions(travelId, driverPosition);
@@ -107,9 +109,9 @@ public class PushNotificationService {
                 // update no redis
                 redisNotificationService.updateNotificationState(travelId, student.studentId(),
                         new NotificationStateDTO(zone,
-                        distance.toString(),
-                        lastNotificationAt,
-                        timestamp));
+                                distance.toString(),
+                                lastNotificationAt,
+                                timestamp));
             }
         });
 
@@ -119,57 +121,99 @@ public class PushNotificationService {
     gera pushs de notificações por anomalias (detector de problemas) <aluno - ônibus>
     ex.: Ônibus está há 12 minutos parado
     */
-    public void averageVelocityAlert(UUID travelId) {
+    private VelocityAnalysisDTO analyzeVehicleMovement(UUID travelId) {
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new TripNotFound("Viagem não encontrada. " + travelId));
 
+        LiveLocationDTO actuallyPosition =
+                redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
+        LastLocationDTO lastLocation =
+                redisTrackingService.getLastLocation(travel.getId());
 
-        LiveLocationDTO actuallyPosition = redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
+        VelocityAnalysisDTO result;
 
-        // reading necessary redis state
-        PreviousStateDTO lastPing = redisTrackingService.getPreviousEta(String.valueOf(travel.getId()));
-
-        // first ping - state does not exist
-        if (lastPing == null) {
-            redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
-            return;
+        // Primeiro ping
+        if (lastLocation == null) {
+            result = new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
         }
+        else {
+            long elapsedSeconds = Duration
+                    .between(Instant.ofEpochMilli(lastLocation.timestamp()), Instant.now())
+                    .toSeconds();
 
-        Duration timeElapsed = Duration.between(Instant.ofEpochMilli(lastPing.timeStamp()), Instant.now());
-        if (timeElapsed.toSeconds() >= 5) {
-            LastLocationDTO lastLocation = redisTrackingService.getLastLocation(travel.getId());
-
-            if (lastLocation == null) {
-                redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
-                return;
+            final int MIN_SECONDS = 5;
+            if (elapsedSeconds < MIN_SECONDS) {
+                result = new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
             }
+            else {
+                Double distanceBetweenPings =
+                        routeCalculationService.calculateHaversineDistanceInMeters(
+                                actuallyPosition.longitude(), actuallyPosition.latitude(),
+                                lastLocation.longitude(), lastLocation.latitude());
 
-            Double distanceBetweenPings = routeCalculationService.calculateHaversineDistanceInMeters(actuallyPosition.longitude(),
-                    actuallyPosition.latitude(),
-                    lastLocation.longitude(),
-                    lastLocation.latitude());
+                final int MIN_SOLID_SPEED_DISTANCE = 5;
+                if (distanceBetweenPings < MIN_SOLID_SPEED_DISTANCE) {
+                    result = new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
+                }
+                else {
+                    PreviousStateDTO previousEta =
+                            redisTrackingService.getPreviousEta(String.valueOf(travel.getId()));
 
-            if (!timeElapsed.isZero()) {
-                var distanceRemaining = lastPing.distanceRemaining();
+                    if (previousEta == null || previousEta.distanceRemaining() == null) {
+                        result = new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
+                    }
+                    else {
+                        double distanceRemaining = previousEta.distanceRemaining();
+                        if (distanceRemaining <= 0 || distanceRemaining < distanceBetweenPings) {
+                            result = new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
+                        }
+                        else {
+                            double avgSpeed = distanceBetweenPings / elapsedSeconds;
+                            final double MIN_SPEED_THRESHOLD = 0.5;
 
-                var avgSpeed = distanceBetweenPings / timeElapsed.toSeconds();
+                            Double newETA = null;
+                            MovementState state;
 
-                var newETA = distanceRemaining / avgSpeed;
+                            if (avgSpeed == 0) {
+                                state = MovementState.STOPPED;
+                            } else if (avgSpeed <= MIN_SPEED_THRESHOLD) {
+                                state = MovementState.SLOW;
+                            } else {
+                                state = MovementState.NORMAL;
+                                if (previousEta.durationRemaining() != null) {
+                                    newETA = distanceRemaining / avgSpeed;
+                                    redisTrackingService.updateTripEtaState(
+                                            travel.getId(),
+                                            distanceRemaining,
+                                            newETA,
+                                            Instant.now()
+                                    );
+                                }
+                            }
 
-                redisTrackingService.updateTripEtaState(travel.getId(), distanceRemaining, newETA, Instant.now());
+                            result = new VelocityAnalysisDTO(
+                                    avgSpeed,
+                                    elapsedSeconds,
+                                    distanceBetweenPings,
+                                    newETA,
+                                    state
+                            );
+                        }
+                    }
+                }
             }
-
         }
 
         redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
 
-        /* PONTOS DE AJUSTES
-        * Ordem das operações (ler → calcular → salvar)
-        Padrão de timestamp
-        Evitar múltiplas leituras do Redis
-        Preparar terreno para regras de anomalia
-* */
+        return result;
     }
+
+
+    private void evaluateMovementAnomaly(VelocityAnalysisDTO velocityAnalysis) {
+
+    }
+
 
     // distance between driver and student
     protected List<DistanceResponseDTO> distanceBetweenPositions(UUID travelId, LiveLocationDTO driverPosition) {

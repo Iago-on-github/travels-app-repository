@@ -208,7 +208,7 @@ public class RedisTrackingService {
 
         String distanceRemainingString = String.valueOf(distanceRemaining);
         String durationRemainingToString = String.valueOf(durationRemaining);
-        String timestampToString = String.valueOf(timestamp);
+        String timestampToString = String.valueOf(timestamp.toEpochMilli());
 
         String key = HASH_KEY_PREFIX + travelId;
 
