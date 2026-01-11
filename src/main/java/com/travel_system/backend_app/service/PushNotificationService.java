@@ -128,7 +128,7 @@ public class PushNotificationService {
         LiveLocationDTO actuallyPosition =
                 redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
         LastLocationDTO lastLocation =
-                redisTrackingService.getLastLocation(travel.getId());
+                redisTrackingService.getLastLocation(String.valueOf(travel.getId()));
 
         VelocityAnalysisDTO result;
 
@@ -208,12 +208,6 @@ public class PushNotificationService {
 
         return result;
     }
-
-
-    private void evaluateMovementAnomaly(VelocityAnalysisDTO velocityAnalysis) {
-
-    }
-
 
     // distance between driver and student
     protected List<DistanceResponseDTO> distanceBetweenPositions(UUID travelId, LiveLocationDTO driverPosition) {

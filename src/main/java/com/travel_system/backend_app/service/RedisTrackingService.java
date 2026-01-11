@@ -3,12 +3,16 @@ package com.travel_system.backend_app.service;
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.Travel;
+import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
+import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.response.LastLocationDTO;
+import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.repository.DriverRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
+import io.micrometer.common.util.StringUtils;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -118,9 +122,9 @@ public class RedisTrackingService {
         }
     }
 
-    // fornece a última loc registrada (antes da loc mais recente)
-    public LastLocationDTO getLastLocation(UUID travelId) {
-        Travel travel = travelRepository.findById(travelId)
+    // fornece a última loc registrada - estado de localização (antes da loc mais recente)
+    public LastLocationDTO getLastLocation(String travelId) {
+        Travel travel = travelRepository.findById(UUID.fromString(travelId))
                 .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
 
         String key = HASH_KEY_PREFIX + travel.getId();
@@ -143,6 +147,34 @@ public class RedisTrackingService {
 
             return new LastLocationDTO(LastPingLatToDouble, LastPingLngToDouble, timestampToLong);
 
+        }
+    }
+
+    // fornece o último estado do veículo
+    public AnalyzeMovementStateDTO getLastMovementState(String travelId) {
+        Travel travel = travelRepository.findById(UUID.fromString(travelId)).orElseThrow(() -> new EntityNotFoundException("Travel não encontrada"));
+
+        String key = HASH_KEY_PREFIX + travel.getId();
+
+        String cacheMovementState = hashOperations.get(key, "movementState");
+        String cacheStateStartedAt = hashOperations.get(key, "stateStartedAt");
+        String cacheLastNotificationSendAt = hashOperations.get(key, "lastNotificationSendAt");
+        String cacheLastEtaNotificationAt = hashOperations.get(key, "lastEtaNotificationAt");
+
+        // if not exists = first ping
+        if (cacheMovementState == null || cacheStateStartedAt == null) {
+            return null;
+        } else {
+            if (StringUtils.isEmpty(cacheMovementState) || StringUtils.isBlank(cacheMovementState)
+                    || StringUtils.isEmpty(cacheStateStartedAt) || StringUtils.isBlank(cacheStateStartedAt)) {
+                throw new InvalidMovementPropertiesException("movementState ou stateStartedAt invalidos ou corrompidos");
+            }
+
+            return new AnalyzeMovementStateDTO(
+                    MovementState.valueOf(cacheMovementState),
+                    Instant.parse(cacheStateStartedAt),
+                    cacheLastNotificationSendAt == null ? null : Instant.parse(cacheLastNotificationSendAt),
+                    cacheLastEtaNotificationAt == null ? null : Instant.parse(cacheLastEtaNotificationAt));
         }
     }
 
@@ -219,5 +251,13 @@ public class RedisTrackingService {
         data.put("timestamp", timestampToString);
 
         hashOperations.putAll(key, data);
+    }
+
+    public void storeLastKnownState(String travelId, VelocityAnalysisDTO velocityAnalysis, String lastSendNotification, String lastEtaNotification) {
+        if (travelId == null || velocityAnalysis.movementState() == null || velocityAnalysis.newETA() == null || velocityAnalysis.timeElapsed() == null) {
+            throw new EtaDataStatesInvalidException("Dados do estado ETA inválidos ou corrompidos");
+        }
+
+        LastLocationDTO lastLocation = getLastLocation(travelId);
     }
 }
