@@ -4,6 +4,7 @@ import com.travel_system.backend_app.exceptions.TravelException;
 import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.GeoPosition;
 import com.travel_system.backend_app.model.Travel;
+import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
 import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
@@ -13,6 +14,7 @@ import com.travel_system.backend_app.model.dtos.response.LastLocationDTO;
 import com.travel_system.backend_app.model.dtos.response.NotificationStateDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
+import com.travel_system.backend_app.model.enums.ShouldNotify;
 import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.springframework.stereotype.Service;
@@ -117,6 +119,48 @@ public class PushNotificationService {
 
     }
 
+    // usa analyzeVehicleMovement e decide se deve notificar
+    // implementar @async dps
+    public ShouldNotify shouldSendNotification(String travelId, VelocityAnalysisDTO velocityAnalysis, AnalyzeMovementStateDTO analyzeMovementState) {
+        // verificar mudanças de estado
+        AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(travelId);
+        MovementState actualMovementState = velocityAnalysis.movementState();
+
+        // primeiro ciclo: não notificar
+        if (lastMovementState == null || lastMovementState.movementState() == null || lastMovementState.stateStartedAt() == null || lastMovementState.lastNotificationSendAt() == null) {
+            return ShouldNotify.SHOULD_NO_NOTIFY;
+        }
+
+        Instant now = Instant.now();
+
+        final long STATE_TIME_LIMIT_MS = 4_000;
+        final long NOTIFICATION_COOLDOWN_MS = 12_000;
+
+        // comparar estados
+        // se o estado mudou, ainda nao notifica
+        if (!actualMovementState.equals(lastMovementState.movementState())) {
+            return ShouldNotify.SHOULD_NO_NOTIFY;
+        }
+
+        if (actualMovementState.equals(MovementState.NORMAL)) return ShouldNotify.SHOULD_NO_NOTIFY;
+
+        long durationOnState = now.toEpochMilli() - lastMovementState.stateStartedAt().toEpochMilli();
+        long timeSinceLastNotification = lastMovementState.lastEtaNotificationAt().toEpochMilli();
+
+        boolean stayedLongEnough = durationOnState >= STATE_TIME_LIMIT_MS;
+        boolean cooldownExpired = timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS;
+
+        if (stayedLongEnough && cooldownExpired) {
+            if (actualMovementState.equals(MovementState.SLOW)) {
+                return ShouldNotify.SHOULD_NOTIFY_SLOW;
+            }
+            if (actualMovementState.equals(MovementState.STOPPED)) {
+                return ShouldNotify.SHOULD_NOTIFY_STOPPED;
+            }
+        }
+        return ShouldNotify.SHOULD_NO_NOTIFY;
+    }
+
     /*
     gera pushs de notificações por anomalias (detector de problemas) <aluno - ônibus>
     ex.: Ônibus está há 12 minutos parado
@@ -208,6 +252,8 @@ public class PushNotificationService {
 
         return result;
     }
+
+
 
     // distance between driver and student
     protected List<DistanceResponseDTO> distanceBetweenPositions(UUID travelId, LiveLocationDTO driverPosition) {

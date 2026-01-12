@@ -253,11 +253,44 @@ public class RedisTrackingService {
         hashOperations.putAll(key, data);
     }
 
-    public void storeLastKnownState(String travelId, VelocityAnalysisDTO velocityAnalysis, String lastSendNotification, String lastEtaNotification) {
-        if (travelId == null || velocityAnalysis.movementState() == null || velocityAnalysis.newETA() == null || velocityAnalysis.timeElapsed() == null) {
+    // persiste e mantém coerente o estado de movimento do veículo ao logo do tempo
+    public void storeLastKnownState(String travelId, VelocityAnalysisDTO velocityAnalysis) {
+        Travel travel = travelRepository.findById(UUID.fromString(travelId)).orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada"));
+
+        if (velocityAnalysis == null || velocityAnalysis.movementState() == null) {
             throw new EtaDataStatesInvalidException("Dados do estado ETA inválidos ou corrompidos");
         }
 
-        LastLocationDTO lastLocation = getLastLocation(travelId);
+        String key = HASH_KEY_PREFIX + travel.getId();
+
+        String movementState = String.valueOf(velocityAnalysis.movementState());
+        String stateStartedAt = String.valueOf(Instant.now());
+
+        Map<String, String> data = new HashMap<>();
+
+        String cacheMovementState = hashOperations.get(key, "movementState");
+        String lastNotificationSendAt = hashOperations.get(key, "lastNotificationSendAt");
+        String lastEtaNotificationAt = hashOperations.get(key, "lastEtaNotificationAt");
+
+        if (cacheMovementState == null) {
+            velocityAnalysisHelper(key, movementState, data, stateStartedAt, lastNotificationSendAt, lastEtaNotificationAt);
+        }
+        else if (!movementState.equals(cacheMovementState)) {
+            velocityAnalysisHelper(key, movementState, data, stateStartedAt, lastNotificationSendAt, lastEtaNotificationAt);
+        } else {
+            data.put("movementState", movementState);
+            hashOperations.putAll(key, data);
+        }
+
+    }
+
+    private void velocityAnalysisHelper(String key, String movementState, Map<String, String> data, String stateStartedAt, String lastNotificationSendAt, String lastEtaNotificationAt) {
+        data.put("movementState", movementState);
+        data.put("stateStartedAt", stateStartedAt);
+
+        if (lastNotificationSendAt != null) data.put("lastNotificationSendAt", lastNotificationSendAt);
+        if (lastEtaNotificationAt != null) data.put("lastEtaNotificationAt", lastEtaNotificationAt);
+
+        hashOperations.putAll(key, data);
     }
 }
