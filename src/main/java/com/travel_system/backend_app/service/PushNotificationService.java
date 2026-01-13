@@ -1,8 +1,6 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.TravelException;
 import com.travel_system.backend_app.exceptions.TripNotFound;
-import com.travel_system.backend_app.model.GeoPosition;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
 import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
@@ -21,8 +19,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,8 +35,9 @@ public class PushNotificationService {
     private final RabbitMQProducer rabbitMQProducer;
     private final RedisTrackingService redisTrackingService;
     private final TravelRepository travelRepository;
+    private final AsyncNotificationService asyncNotificationService;
 
-    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer, RedisTrackingService redisTrackingService, TravelRepository travelRepository) {
+    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer, RedisTrackingService redisTrackingService, TravelRepository travelRepository, AsyncNotificationService asyncNotificationService) {
         this.travelTrackingService = travelTrackingService;
         this.travelService = travelService;
         this.routeCalculationService = routeCalculationService;
@@ -48,6 +45,7 @@ public class PushNotificationService {
         this.rabbitMQProducer = rabbitMQProducer;
         this.redisTrackingService = redisTrackingService;
         this.travelRepository = travelRepository;
+        this.asyncNotificationService = asyncNotificationService;
     }
 
     /*
@@ -119,11 +117,30 @@ public class PushNotificationService {
 
     }
 
+    public void processVehicleMovement(UUID travelId, LiveLocationDTO actuallyPosition, Instant timestamp, double velocity) {
+        // calcular o estado atual
+        VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(travelId);
+
+        ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis);
+
+        interpretDecision(travelId, decision, velocityAnalysis);
+
+        redisTrackingService.storeLastKnownState(String.valueOf(travelId), velocityAnalysis);
+    }
+
+    private void interpretDecision(UUID travelId, ShouldNotify shouldNotify, VelocityAnalysisDTO velocityAnalysis) {
+
+        if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_SLOW)) {
+//            asyncNotificationService.
+        } else if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_STOPPED)) {
+        }
+
+    }
+
     // usa analyzeVehicleMovement e decide se deve notificar
-    // implementar @async dps
-    public ShouldNotify shouldSendNotification(String travelId, VelocityAnalysisDTO velocityAnalysis, AnalyzeMovementStateDTO analyzeMovementState) {
+    public ShouldNotify shouldSendNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
         // verificar mudanças de estado
-        AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(travelId);
+        AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(String.valueOf(travelId));
         MovementState actualMovementState = velocityAnalysis.movementState();
 
         // primeiro ciclo: não notificar
@@ -242,6 +259,7 @@ public class PushNotificationService {
                                     newETA,
                                     state
                             );
+
                         }
                     }
                 }
@@ -252,8 +270,6 @@ public class PushNotificationService {
 
         return result;
     }
-
-
 
     // distance between driver and student
     protected List<DistanceResponseDTO> distanceBetweenPositions(UUID travelId, LiveLocationDTO driverPosition) {

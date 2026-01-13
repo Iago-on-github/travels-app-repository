@@ -284,6 +284,18 @@ public class RedisTrackingService {
 
     }
 
+    // marca que uma notificação foi enviada
+    public void markNotificationAsSent(String travelId) {
+        Travel travel = travelRepository.findById(UUID.fromString(travelId)).orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada"));
+
+        String key = HASH_KEY_PREFIX + travel.getId();
+
+        String lastNotificationSendAt = String.valueOf(Instant.now());
+
+        hashOperations.put(key, "lastNotificationSendAt", lastNotificationSendAt);
+
+    }
+
     private void velocityAnalysisHelper(String key, String movementState, Map<String, String> data, String stateStartedAt, String lastNotificationSendAt, String lastEtaNotificationAt) {
         data.put("movementState", movementState);
         data.put("stateStartedAt", stateStartedAt);
