@@ -112,6 +112,13 @@
             <version>5.8.0</version>
         </dependency>
 
+		<!--	firebase	-->
+		<dependency>
+			<groupId>com.google.firebase</groupId>
+			<artifactId>firebase-admin</artifactId>
+			<version>9.2.0</version>
+		</dependency>
+
         <!-- #CACHING DEPENDENCIES -->
         <dependency>
             <groupId>org.springframework.boot</groupId>

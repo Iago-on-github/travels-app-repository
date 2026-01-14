@@ -117,28 +117,19 @@ public class PushNotificationService {
 
     }
 
-    public void processVehicleMovement(UUID travelId, LiveLocationDTO actuallyPosition, Instant timestamp, double velocity) {
-        // calcular o estado atual
+    public void processVehicleMovement(UUID travelId) {
         VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(travelId);
 
         ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis);
 
-        interpretDecision(travelId, decision, velocityAnalysis);
+        // chama para notificação
+        asyncNotificationService.processNotificationType(decision);
 
         redisTrackingService.storeLastKnownState(String.valueOf(travelId), velocityAnalysis);
     }
 
-    private void interpretDecision(UUID travelId, ShouldNotify shouldNotify, VelocityAnalysisDTO velocityAnalysis) {
-
-        if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_SLOW)) {
-//            asyncNotificationService.
-        } else if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_STOPPED)) {
-        }
-
-    }
-
     // usa analyzeVehicleMovement e decide se deve notificar
-    public ShouldNotify shouldSendNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
+    private ShouldNotify shouldSendNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
         // verificar mudanças de estado
         AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(String.valueOf(travelId));
         MovementState actualMovementState = velocityAnalysis.movementState();
