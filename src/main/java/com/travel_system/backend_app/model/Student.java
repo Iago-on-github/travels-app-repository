@@ -17,6 +17,9 @@ public class Student extends UserModel {
     private String course;
     @OneToMany(mappedBy = "student")
     private Set<StudentTravel> studentTravels = new HashSet<>();
+    @OneToMany(mappedBy = "student", cascade = CascadeType.ALL)
+    @JoinColumn(name = "deviceToken_id")
+    private Set<DeviceToken> deviceTokens = new HashSet<>();
 
     public Student() {
     }
@@ -56,5 +59,13 @@ public class Student extends UserModel {
 
     public void setStudentTravels(Set<StudentTravel> studentTravels) {
         this.studentTravels = studentTravels;
+    }
+
+    public Set<DeviceToken> getDeviceTokens() {
+        return deviceTokens;
+    }
+
+    public void setDeviceTokens(Set<DeviceToken> deviceTokens) {
+        this.deviceTokens = deviceTokens;
     }
 }
