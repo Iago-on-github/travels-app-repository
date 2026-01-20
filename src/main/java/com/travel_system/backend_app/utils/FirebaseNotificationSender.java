@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.utils;
 
-import com.google.firebase.messaging.FirebaseMessaging;
-import com.google.firebase.messaging.Message;
+import com.google.firebase.messaging.*;
 import com.travel_system.backend_app.exceptions.DeviceTokenNotFoundException;
 import com.travel_system.backend_app.exceptions.DomainValidationException;
 import com.travel_system.backend_app.exceptions.InvalidDeviceTokenException;
@@ -62,8 +61,54 @@ public class FirebaseNotificationSender {
         deviceTokenRepository.save(deviceToken);
     }
 
+    // enviar notificação ao firebase
+    public VehicleMovementNotificationDTO pushNotificationToFirebase(UUID studentId, UUID travelId, MovementState movementState, Priority priority, String message) {
+        Set<DeviceToken> studentActiveTokens = studentActiveTokens(studentId);
+
+        List<String> convertedTokens = studentActiveTokens.stream().map(DeviceToken::getToken).toList();
+
+        if (studentActiveTokens.isEmpty()) return null;
+
+        VehicleMovementNotificationDTO movementNotificationDTO = new VehicleMovementNotificationDTO(travelId, movementState, Instant.now(), message, priority);
+
+        MulticastMessage payload = convertMovementNotifyToFcmFormat(travelId, movementState, priority, message, studentActiveTokens);
+
+        try {
+            BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(payload);
+            if (response.getFailureCount() > 0) {
+                List<SendResponse> responses = response.getResponses();
+
+                List<String> failureTokens = new ArrayList<>();
+                for (SendResponse sendResponse : responses) {
+                    if (!sendResponse.isSuccessful()) {
+                        failureTokens.add(convertedTokens.getFirst());
+                    }
+                }
+            }
+        } catch (FirebaseMessagingException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    // converte dto para formato fcm
+    private MulticastMessage convertMovementNotifyToFcmFormat(UUID travelId, MovementState movementState, Priority priority, String message, Set<DeviceToken> studentActiveTokens) {
+        Map<String, String> data = new HashMap<>();
+
+        data.put("travelId", String.valueOf(travelId));
+        data.put("movementState", String.valueOf(movementState));
+        data.put("priority", String.valueOf(priority));
+        data.put("message", message);
+
+        Set<String> convertedTokens = studentActiveTokens.stream().map(DeviceToken::getToken).collect(Collectors.toSet());
+
+        return MulticastMessage.builder()
+                .putAllData(data)
+                .addAllTokens(convertedTokens)
+                .build();
+    }
+
     // pega todos os tokens ativos do usuário
-    public Set<DeviceToken> studentActiveTokens(UUID studentId) {
+    private Set<DeviceToken> studentActiveTokens(UUID studentId) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new EntityNotFoundException("estudante não encontrado" + studentId));
 
@@ -71,20 +116,6 @@ public class FirebaseNotificationSender {
                 .stream().filter(DeviceToken::isActive).collect(Collectors.toSet());
     }
 
-    // enviar notificação ao firebase
-    public VehicleMovementNotificationDTO pushNotificationToFirebase(UUID studentId, UUID travelId, MovementState movementState, Priority priority, String message) {
-        Set<DeviceToken> studentActiveTokens = studentActiveTokens(studentId);
-
-        if (studentActiveTokens.isEmpty()) return null;
-
-        VehicleMovementNotificationDTO movementNotificationDTO = new VehicleMovementNotificationDTO(travelId, movementState, Instant.now(), message, priority);
-
-        Message payload =;
-
-        studentActiveTokens.forEach(deviceToken -> {
-            firebaseMessaging.send(payload);
-        });
-    }
 
     // tratar falhas
 }
