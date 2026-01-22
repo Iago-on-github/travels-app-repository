@@ -1,12 +1,9 @@
 package com.travel_system.backend_app.utils;
 
 import com.google.firebase.messaging.*;
-import com.travel_system.backend_app.exceptions.DeviceTokenNotFoundException;
 import com.travel_system.backend_app.exceptions.DomainValidationException;
-import com.travel_system.backend_app.exceptions.InvalidDeviceTokenException;
 import com.travel_system.backend_app.model.DeviceToken;
 import com.travel_system.backend_app.model.Student;
-import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.VehicleMovementNotificationDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.model.enums.Platform;
@@ -14,6 +11,8 @@ import com.travel_system.backend_app.model.enums.Priority;
 import com.travel_system.backend_app.repository.DeviceTokenRepository;
 import com.travel_system.backend_app.repository.StudentRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
@@ -26,17 +25,13 @@ public class FirebaseNotificationSender {
     private final DeviceTokenRepository deviceTokenRepository;
     private final StudentRepository studentRepository;
     private final FirebaseMessaging firebaseMessaging;
+    private static final Logger logger = LoggerFactory.getLogger(FirebaseNotificationSender.class);
 
     public FirebaseNotificationSender(DeviceTokenRepository deviceTokenRepository, StudentRepository studentRepository, FirebaseMessaging firebaseMessaging) {
         this.deviceTokenRepository = deviceTokenRepository;
         this.studentRepository = studentRepository;
         this.firebaseMessaging = firebaseMessaging;
     }
-
-    // proximos passos:
-    // buscar todos os tokens ativos do student
-    // enviar notificação para cada um
-    // trtar falhas do firebase (token inválido: active = false)
 
     // registra/atualiza os tokens do usuário
     public void manageUserToken(Student student, String token, Platform platform) {
@@ -49,13 +44,11 @@ public class FirebaseNotificationSender {
             deviceToken = existingDeviceToken.get();
 
             deviceToken.setStudent(student);
-
         } else {
             deviceToken = new DeviceToken();
 
             deviceToken.setStudent(student);
             deviceToken.setToken(token.trim());
-
         }
         deviceToken.setPlatform(platform);
         deviceTokenRepository.save(deviceToken);
@@ -65,33 +58,62 @@ public class FirebaseNotificationSender {
     public VehicleMovementNotificationDTO pushNotificationToFirebase(UUID studentId, UUID travelId, MovementState movementState, Priority priority, String message) {
         Set<DeviceToken> studentActiveTokens = studentActiveTokens(studentId);
 
-        List<String> convertedTokens = studentActiveTokens.stream().map(DeviceToken::getToken).toList();
-
         if (studentActiveTokens.isEmpty()) return null;
 
-        VehicleMovementNotificationDTO movementNotificationDTO = new VehicleMovementNotificationDTO(travelId, movementState, Instant.now(), message, priority);
+        List<DeviceToken> deviceTokens = studentActiveTokens.stream().toList();
 
-        MulticastMessage payload = convertMovementNotifyToFcmFormat(travelId, movementState, priority, message, studentActiveTokens);
+        MulticastMessage payload = convertMovementNotifyToFcmFormat(travelId, movementState, priority, message, deviceTokens);
 
         try {
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(payload);
-            if (response.getFailureCount() > 0) {
-                List<SendResponse> responses = response.getResponses();
 
-                List<String> failureTokens = new ArrayList<>();
-                for (SendResponse sendResponse : responses) {
-                    if (!sendResponse.isSuccessful()) {
-                        failureTokens.add(convertedTokens.getFirst());
-                    }
+            logger.info("Tokens enviados ao firebase: {}", response.getSuccessCount());
+            if (response.getFailureCount() > 0) {
+                List<DeviceToken> failureTokens = getFailureDeviceTokens(response, deviceTokens);
+                logger.error("Falha crítica no FCM para o aluno: {} {}", studentId, response.getFailureCount());
+                if (!failureTokens.isEmpty()) {
+                    deviceTokenRepository.saveAll(failureTokens);
                 }
             }
         } catch (FirebaseMessagingException e) {
-            throw new RuntimeException(e);
+            logger.error("Erro no envio da mensagem para o Firebase: {}", e.getMessagingErrorCode());
         }
+
+        return new VehicleMovementNotificationDTO(travelId, movementState, Instant.now(), message, priority);
+    }
+
+    // retorna os tokens que falharam da response
+    private static List<DeviceToken> getFailureDeviceTokens(BatchResponse response, List<DeviceToken> deviceTokens) {
+        List<SendResponse> responses = response.getResponses();
+
+        List<DeviceToken> failureTokens = new ArrayList<>();
+        for (int i = 0; i < responses.size(); i++) {
+            if (!responses.get(i).isSuccessful()) {
+
+                DeviceToken failedToken = deviceTokens.get(i);
+
+                MessagingErrorCode messagingErrorCode = responses.get(i).getException()
+                        .getMessagingErrorCode();
+
+                // usuário removeu o app ou limpou os dados ou formato incorreto do token
+                if (messagingErrorCode.equals(MessagingErrorCode.UNREGISTERED) || messagingErrorCode.equals(MessagingErrorCode.INVALID_ARGUMENT)) {
+                    logger.info("Processo de desativação do token... motivo: {}", messagingErrorCode);
+                    failedToken.setActive(false);
+
+                    // lista temporária para desativar os tokens
+                    failureTokens.add(failedToken);
+                }
+
+                if (messagingErrorCode.equals(MessagingErrorCode.QUOTA_EXCEEDED)) {
+                    logger.warn("Limite do firebase atingido: {}", messagingErrorCode);
+                }
+            }
+        }
+        return failureTokens;
     }
 
     // converte dto para formato fcm
-    private MulticastMessage convertMovementNotifyToFcmFormat(UUID travelId, MovementState movementState, Priority priority, String message, Set<DeviceToken> studentActiveTokens) {
+    private MulticastMessage convertMovementNotifyToFcmFormat(UUID travelId, MovementState movementState, Priority priority, String message, List<DeviceToken> studentActiveTokens) {
         Map<String, String> data = new HashMap<>();
 
         data.put("travelId", String.valueOf(travelId));
@@ -115,7 +137,4 @@ public class FirebaseNotificationSender {
         return student.getDeviceTokens()
                 .stream().filter(DeviceToken::isActive).collect(Collectors.toSet());
     }
-
-
-    // tratar falhas
 }
