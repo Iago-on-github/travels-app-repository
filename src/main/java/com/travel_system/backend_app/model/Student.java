@@ -18,7 +18,6 @@ public class Student extends UserModel {
     @OneToMany(mappedBy = "student")
     private Set<StudentTravel> studentTravels = new HashSet<>();
     @OneToMany(mappedBy = "student", cascade = CascadeType.ALL)
-    @JoinColumn(name = "deviceToken_id")
     private Set<DeviceToken> deviceTokens = new HashSet<>();
 
     public Student() {
