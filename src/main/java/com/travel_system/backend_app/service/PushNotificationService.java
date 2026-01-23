@@ -123,7 +123,7 @@ public class PushNotificationService {
         ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis);
 
         // chama para notificação
-        asyncNotificationService.processNotificationType(decision);
+        asyncNotificationService.processNotificationType(travelId, velocityAnalysis, decision);
 
         redisTrackingService.storeLastKnownState(String.valueOf(travelId), velocityAnalysis);
     }
@@ -143,6 +143,7 @@ public class PushNotificationService {
 
         final long STATE_TIME_LIMIT_MS = 4_000;
         final long NOTIFICATION_COOLDOWN_MS = 12_000;
+        final long NOTIFICATION_COOLDOWN_MS_STOPPED = 300_000;
 
         // comparar estados
         // se o estado mudou, ainda nao notifica
@@ -153,7 +154,7 @@ public class PushNotificationService {
         if (actualMovementState.equals(MovementState.NORMAL)) return ShouldNotify.SHOULD_NO_NOTIFY;
 
         long durationOnState = now.toEpochMilli() - lastMovementState.stateStartedAt().toEpochMilli();
-        long timeSinceLastNotification = lastMovementState.lastEtaNotificationAt().toEpochMilli();
+        long timeSinceLastNotification = now.toEpochMilli() - lastMovementState.lastEtaNotificationAt().toEpochMilli();
 
         boolean stayedLongEnough = durationOnState >= STATE_TIME_LIMIT_MS;
         boolean cooldownExpired = timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS;
@@ -162,7 +163,7 @@ public class PushNotificationService {
             if (actualMovementState.equals(MovementState.SLOW)) {
                 return ShouldNotify.SHOULD_NOTIFY_SLOW;
             }
-            if (actualMovementState.equals(MovementState.STOPPED)) {
+            if (actualMovementState.equals(MovementState.STOPPED) && timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS_STOPPED) {
                 return ShouldNotify.SHOULD_NOTIFY_STOPPED;
             }
         }

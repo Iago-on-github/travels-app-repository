@@ -1,15 +1,24 @@
 package com.travel_system.backend_app.service;
 
+import com.google.firebase.FirebaseException;
+import com.google.firebase.messaging.FirebaseMessagingException;
 import com.travel_system.backend_app.exceptions.EtaDataStatesInvalidException;
+import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.dtos.VehicleMovementNotificationDTO;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.model.enums.Priority;
 import com.travel_system.backend_app.model.enums.ShouldNotify;
+import com.travel_system.backend_app.repository.StudentTravelRepository;
+import com.travel_system.backend_app.utils.FirebaseNotificationSender;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -17,22 +26,36 @@ import java.util.UUID;
 public class AsyncNotificationService {
 
     private final RedisTrackingService redisTrackingService;
+    private final FirebaseNotificationSender firebaseNotificationSender;
+    private final StudentTravelRepository studentTravelRepository;
 
-    public AsyncNotificationService(RedisTrackingService redisTrackingService) {
+    private static final Logger logger = LoggerFactory.getLogger(AsyncNotificationService.class);
+
+
+    public AsyncNotificationService(RedisTrackingService redisTrackingService, FirebaseNotificationSender firebaseNotificationSender, StudentTravelRepository studentTravelRepository) {
         this.redisTrackingService = redisTrackingService;
+        this.firebaseNotificationSender = firebaseNotificationSender;
+        this.studentTravelRepository = studentTravelRepository;
     }
 
-    public void processNotificationType(ShouldNotify shouldNotify) {
+    @Async
+    public void processNotificationType(UUID travelId, VelocityAnalysisDTO velocityAnalysis, ShouldNotify shouldNotify) {
+        if (shouldNotify.equals(ShouldNotify.SHOULD_NO_NOTIFY)) return;
 
+        if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_SLOW)) {
+            slowNotification(travelId, velocityAnalysis);
+            logger.info("Enviando notificação para ônibus lento... {} {}", travelId, shouldNotify);
+        }
+        if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_STOPPED)) {
+            stoppedNotification(travelId, velocityAnalysis);
+            logger.info("Enviando notificação para ônibus parado... {} {}", travelId, shouldNotify);
+        }
     }
 
     /*
     * envia notificação quando o ônibus estiver LENTO (slow)
     * deve marcar corretamente no redis quando a notificação foi enviada
     * */
-    // posteriormente validar alinhamento com métricas e logs para produção
-
-    // já inserido e configurado o firebase no projeto. Verificar os próximos passos
     private void slowNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
         if (travelId == null || velocityAnalysis == null) throw new EtaDataStatesInvalidException("Dados da viagem inválidos ou corrompidos");
 
@@ -41,15 +64,51 @@ public class AsyncNotificationService {
         // recuperar infos e preparar dto de envio ao firebase
         MovementState movementState = velocityAnalysis.movementState();
         Instant now = Instant.now();
-        final String message = "Alerta de ônibus lento. Fique atento.";
-        Priority priority = Priority.HIGH;
-
-        VehicleMovementNotificationDTO movementNotification = new VehicleMovementNotificationDTO(travelId, movementState, now, message, priority);
-
-        // enviar notificação
+        final String message = "Alerta de ônibus LENTO. Fique atento.";
+        Priority priority = Priority.NORMAL;
 
         // controlar cooldawn
         redisTrackingService.markNotificationAsSent(String.valueOf(travelId));
 
+        List<UUID> studentsAtTrip = studentTravelRepository.findStudentIdsByTravelIdAndDisembarkHourIsNull(travelId);
+
+        studentsAtTrip.forEach(studentId -> {
+            try {
+                // enviar notificação para cada estudante
+                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message);
+            } catch (Exception e) {
+                logger.error("Falha no envio de notificação para o aluno: {} {}", studentId, e.getMessage());
+            }
+        });
+    }
+
+
+    /*
+     * envia notificação quando o ônibus estiver PARADO (STOPPED)
+     * deve marcar corretamente no redis quando a notificação foi enviada
+     * */
+    private void stoppedNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
+        if (travelId == null || velocityAnalysis == null) throw new EtaDataStatesInvalidException("Dados de viagem inválidos corrompidos.");
+
+        if (!velocityAnalysis.movementState().equals(MovementState.STOPPED)) return;
+
+        MovementState movementState = velocityAnalysis.movementState();
+        Instant now = Instant.now();
+        final String message = "Alerta de ônibus PARADO. Fique atento.";
+        Priority priority = Priority.NORMAL;
+
+        // controlar cooldawn
+        redisTrackingService.markNotificationAsSent(String.valueOf(travelId));
+
+        List<UUID> studentsAtTrip = studentTravelRepository.findStudentIdsByTravelIdAndDisembarkHourIsNull(travelId);
+
+        studentsAtTrip.forEach(studentId -> {
+            try {
+                // enviar notificação para cada estudante
+                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message);
+            } catch (Exception e) {
+                logger.error("Falha no envio de notificação para o aluno: {} {}", studentId, e.getMessage());
+            }
+        });
     }
 }
