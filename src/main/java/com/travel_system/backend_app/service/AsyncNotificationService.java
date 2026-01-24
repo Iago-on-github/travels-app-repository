@@ -31,7 +31,6 @@ public class AsyncNotificationService {
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncNotificationService.class);
 
-
     public AsyncNotificationService(RedisTrackingService redisTrackingService, FirebaseNotificationSender firebaseNotificationSender, StudentTravelRepository studentTravelRepository) {
         this.redisTrackingService = redisTrackingService;
         this.firebaseNotificationSender = firebaseNotificationSender;
@@ -43,12 +42,12 @@ public class AsyncNotificationService {
         if (shouldNotify.equals(ShouldNotify.SHOULD_NO_NOTIFY)) return;
 
         if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_SLOW)) {
-            slowNotification(travelId, velocityAnalysis);
             logger.info("Enviando notificação para ônibus lento... {} {}", travelId, shouldNotify);
+            slowNotification(travelId, velocityAnalysis);
         }
         if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_STOPPED)) {
-            stoppedNotification(travelId, velocityAnalysis);
             logger.info("Enviando notificação para ônibus parado... {} {}", travelId, shouldNotify);
+            stoppedNotification(travelId, velocityAnalysis);
         }
     }
 
@@ -81,7 +80,6 @@ public class AsyncNotificationService {
             }
         });
     }
-
 
     /*
      * envia notificação quando o ônibus estiver PARADO (STOPPED)
