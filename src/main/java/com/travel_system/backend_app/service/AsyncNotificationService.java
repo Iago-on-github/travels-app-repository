@@ -37,7 +37,7 @@ public class AsyncNotificationService {
         this.studentTravelRepository = studentTravelRepository;
     }
 
-    @Async
+    @Async(value = "notificationTaskExecutor")
     public void processNotificationType(UUID travelId, VelocityAnalysisDTO velocityAnalysis, ShouldNotify shouldNotify) {
         if (shouldNotify.equals(ShouldNotify.SHOULD_NO_NOTIFY)) return;
 
