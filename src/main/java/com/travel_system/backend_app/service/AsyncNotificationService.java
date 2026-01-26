@@ -38,16 +38,16 @@ public class AsyncNotificationService {
     }
 
     @Async(value = "notificationTaskExecutor")
-    public void processNotificationType(UUID travelId, VelocityAnalysisDTO velocityAnalysis, ShouldNotify shouldNotify) {
+    public void processNotificationType(UUID travelId, VelocityAnalysisDTO velocityAnalysis, ShouldNotify shouldNotify, UUID traceId) {
         if (shouldNotify.equals(ShouldNotify.SHOULD_NO_NOTIFY)) return;
 
         if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_SLOW)) {
-            logger.info("Enviando notificação para ônibus lento... {} {}", travelId, shouldNotify);
-            slowNotification(travelId, velocityAnalysis);
+            logger.info("Enviando notificação para ônibus lento... {} {} {}", travelId, shouldNotify, traceId);
+            slowNotification(travelId, velocityAnalysis, traceId);
         }
         if (shouldNotify.equals(ShouldNotify.SHOULD_NOTIFY_STOPPED)) {
-            logger.info("Enviando notificação para ônibus parado... {} {}", travelId, shouldNotify);
-            stoppedNotification(travelId, velocityAnalysis);
+            logger.info("Enviando notificação para ônibus parado... {} {} {}", travelId, shouldNotify, traceId);
+            stoppedNotification(travelId, velocityAnalysis, traceId);
         }
     }
 
@@ -55,7 +55,7 @@ public class AsyncNotificationService {
     * envia notificação quando o ônibus estiver LENTO (slow)
     * deve marcar corretamente no redis quando a notificação foi enviada
     * */
-    private void slowNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
+    private void slowNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis, UUID traceId) {
         if (travelId == null || velocityAnalysis == null) throw new EtaDataStatesInvalidException("Dados da viagem inválidos ou corrompidos");
 
         if (!velocityAnalysis.movementState().equals(MovementState.SLOW)) return;
@@ -74,7 +74,7 @@ public class AsyncNotificationService {
         studentsAtTrip.forEach(studentId -> {
             try {
                 // enviar notificação para cada estudante
-                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message);
+                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message, traceId);
             } catch (Exception e) {
                 logger.error("Falha no envio de notificação para o aluno: {} {}", studentId, e.getMessage());
             }
@@ -85,7 +85,7 @@ public class AsyncNotificationService {
      * envia notificação quando o ônibus estiver PARADO (STOPPED)
      * deve marcar corretamente no redis quando a notificação foi enviada
      * */
-    private void stoppedNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
+    private void stoppedNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis, UUID traceId) {
         if (travelId == null || velocityAnalysis == null) throw new EtaDataStatesInvalidException("Dados de viagem inválidos corrompidos.");
 
         if (!velocityAnalysis.movementState().equals(MovementState.STOPPED)) return;
@@ -103,7 +103,7 @@ public class AsyncNotificationService {
         studentsAtTrip.forEach(studentId -> {
             try {
                 // enviar notificação para cada estudante
-                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message);
+                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message, traceId);
             } catch (Exception e) {
                 logger.error("Falha no envio de notificação para o aluno: {} {}", studentId, e.getMessage());
             }

@@ -15,6 +15,8 @@ import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.model.enums.ShouldNotify;
 import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.utils.RabbitMQProducer;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -36,6 +38,8 @@ public class PushNotificationService {
     private final RedisTrackingService redisTrackingService;
     private final TravelRepository travelRepository;
     private final AsyncNotificationService asyncNotificationService;
+
+    private static final Logger logger = LoggerFactory.getLogger(PushNotificationService.class);
 
     public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer, RedisTrackingService redisTrackingService, TravelRepository travelRepository, AsyncNotificationService asyncNotificationService) {
         this.travelTrackingService = travelTrackingService;
@@ -118,24 +122,27 @@ public class PushNotificationService {
     }
 
     public void processVehicleMovement(UUID travelId) {
+        UUID traceId = UUID.randomUUID();
+        logger.info("[Trace: {}] Iniciando processamento para viagem: {}", traceId, travelId);
         VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(travelId);
 
-        ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis);
+        ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis, traceId);
 
         // chama para notificação
-        asyncNotificationService.processNotificationType(travelId, velocityAnalysis, decision);
+        asyncNotificationService.processNotificationType(travelId, velocityAnalysis, decision, traceId);
 
         redisTrackingService.storeLastKnownState(String.valueOf(travelId), velocityAnalysis);
     }
 
     // usa analyzeVehicleMovement e decide se deve notificar
-    private ShouldNotify shouldSendNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
+    private ShouldNotify shouldSendNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis, UUID traceId) {
         // verificar mudanças de estado
         AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(String.valueOf(travelId));
         MovementState actualMovementState = velocityAnalysis.movementState();
 
         // primeiro ciclo: não notificar
         if (lastMovementState == null || lastMovementState.movementState() == null || lastMovementState.stateStartedAt() == null || lastMovementState.lastNotificationSendAt() == null) {
+            logger.info("[Trace: {}] Decisão: Não notificar", traceId);
             return ShouldNotify.SHOULD_NO_NOTIFY;
         }
 
@@ -151,7 +158,9 @@ public class PushNotificationService {
             return ShouldNotify.SHOULD_NO_NOTIFY;
         }
 
-        if (actualMovementState.equals(MovementState.NORMAL)) return ShouldNotify.SHOULD_NO_NOTIFY;
+        if (actualMovementState.equals(MovementState.NORMAL)) {
+            return ShouldNotify.SHOULD_NO_NOTIFY;
+        }
 
         long durationOnState = now.toEpochMilli() - lastMovementState.stateStartedAt().toEpochMilli();
         long timeSinceLastNotification = now.toEpochMilli() - lastMovementState.lastEtaNotificationAt().toEpochMilli();
@@ -161,12 +170,15 @@ public class PushNotificationService {
 
         if (stayedLongEnough && cooldownExpired) {
             if (actualMovementState.equals(MovementState.SLOW)) {
+                logger.info("[Trace: {}] Decisão: SHOULD_NOTIFY_SLOW", traceId);
                 return ShouldNotify.SHOULD_NOTIFY_SLOW;
             }
             if (actualMovementState.equals(MovementState.STOPPED) && timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS_STOPPED) {
+                logger.info("[Trace: {}] Decisão: NOTIFY_STOPPED", traceId);
                 return ShouldNotify.SHOULD_NOTIFY_STOPPED;
             }
         }
+        logger.info("[Trace: {}] Decisão: NO_NOTIFY (Motivo: Cooldown/Tempo de estado não atingido)", traceId);
         return ShouldNotify.SHOULD_NO_NOTIFY;
     }
 

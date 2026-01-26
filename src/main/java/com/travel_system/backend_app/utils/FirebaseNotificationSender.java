@@ -55,7 +55,7 @@ public class FirebaseNotificationSender {
     }
 
     // enviar notificação ao firebase
-    public VehicleMovementNotificationDTO pushNotificationToFirebase(UUID studentId, UUID travelId, MovementState movementState, Priority priority, String message) {
+    public VehicleMovementNotificationDTO pushNotificationToFirebase(UUID studentId, UUID travelId, MovementState movementState, Priority priority, String message, UUID traceId) {
         Set<DeviceToken> studentActiveTokens = studentActiveTokens(studentId);
 
         if (studentActiveTokens.isEmpty()) return null;
@@ -67,7 +67,7 @@ public class FirebaseNotificationSender {
         try {
             BatchResponse response = FirebaseMessaging.getInstance().sendEachForMulticast(payload);
 
-            logger.info("Tokens enviados ao firebase: {}", response.getSuccessCount());
+            logger.info("[Trace: {}] Tokens enviados ao firebase: {}", traceId, response.getSuccessCount());
             if (response.getFailureCount() > 0) {
                 List<DeviceToken> failureTokens = getFailureDeviceTokens(response, deviceTokens);
                 logger.error("Falha crítica no FCM para o aluno: {} {}", studentId, response.getFailureCount());
@@ -76,7 +76,7 @@ public class FirebaseNotificationSender {
                 }
             }
         } catch (FirebaseMessagingException e) {
-            logger.error("Erro no envio da mensagem para o Firebase: {}", e.getMessagingErrorCode());
+            logger.error("Erro no envio da mensagem para o Firebase: {} {}", e.getMessagingErrorCode(), traceId);
         }
 
         return new VehicleMovementNotificationDTO(travelId, movementState, Instant.now(), message, priority);
