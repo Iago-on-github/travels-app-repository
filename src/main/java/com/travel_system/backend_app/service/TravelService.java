@@ -94,6 +94,9 @@ public class TravelService {
         actualTrip.setTravelStatus(TravelStatus.TRAVELLING);
 
         travelRepository.save(actualTrip);
+
+        // adiciona viagem ativa ao redis para métricas de self-health do sistema
+        redisTrackingService.addActiveTravel(travelId);
     }
 
     @Transactional

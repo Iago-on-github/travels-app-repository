@@ -1,16 +1,13 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.model.Driver;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
-import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.response.LastLocationDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
-import com.travel_system.backend_app.repository.DriverRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
 import io.micrometer.common.util.StringUtils;
 import jakarta.persistence.EntityNotFoundException;
@@ -21,19 +18,21 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 
 @Service
 public class RedisTrackingService {
 
-    private final RedisTemplate<String, Object> redisTemplate;
+    private final RedisTemplate<String, String> redisTemplate;
     private final HashOperations<String, String, String> hashOperations;
     private final TravelRepository travelRepository;
+
+    private final String SET_KEY = "ACTIVE_TRAVELS_KEY";
     private final String HASH_KEY_PREFIX = "travelId:";
 
-    public RedisTrackingService(RedisTemplate<String, Object> redisTemplate, TravelRepository travelRepository) {
+    public RedisTrackingService(RedisTemplate<String, String> redisTemplate, TravelRepository travelRepository) {
         this.redisTemplate = redisTemplate;
         this.hashOperations = redisTemplate.opsForHash();
         this.travelRepository = travelRepository;
@@ -146,7 +145,6 @@ public class RedisTrackingService {
             long timestampToLong = Long.parseLong(timestamp);
 
             return new LastLocationDTO(LastPingLatToDouble, LastPingLngToDouble, timestampToLong);
-
         }
     }
 
@@ -295,6 +293,36 @@ public class RedisTrackingService {
 
         hashOperations.put(key, "lastNotificationSendAt", lastNotificationSendAt);
 
+    }
+
+    // adiciona ids de viagens ativas no set do redis
+    public void addActiveTravel(UUID travelId) {
+        redisTemplate.opsForSet().add(SET_KEY, travelId.toString());
+    }
+
+    // remove ids de viagens inativas do set do redis
+    public void removeUnactiveTravel(UUID travelId) {
+        redisTemplate.opsForSet().remove(SET_KEY, travelId);
+    }
+
+    // retorna os ids de viagens ativas
+    public Set<String> getAllActiveTravelsId() {
+        return redisTemplate.opsForSet().members(SET_KEY);
+    }
+
+    // busca o último momento gravado pelo GPS
+    public Long getLastPingTimestamp(UUID travelId) {
+        String key = HASH_KEY_PREFIX + travelId;
+
+        String timestamp = hashOperations.get(key, "timestamp");
+
+        return timestamp != null? Long.parseLong(timestamp) : null;
+    }
+
+    public void clearTravelLocationCache(UUID travelId) {
+        String key = HASH_KEY_PREFIX + travelId;
+
+        redisTemplate.delete(key);
     }
 
     private void velocityAnalysisHelper(String key, String movementState, Map<String, String> data, String stateStartedAt, String lastNotificationSendAt, String lastEtaNotificationAt) {

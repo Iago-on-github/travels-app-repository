@@ -173,7 +173,6 @@ public class TravelTrackingService {
     }
 
     // MÉTODOS AUXILIARES
-
     private LiveLocationDTO extractLiveCoordinates(UUID travelId) {
         LiveLocationDTO currentLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
 
