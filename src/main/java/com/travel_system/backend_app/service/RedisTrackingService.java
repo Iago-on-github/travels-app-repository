@@ -319,6 +319,7 @@ public class RedisTrackingService {
         return timestamp != null? Long.parseLong(timestamp) : null;
     }
 
+    // limpa os dados de cache do redis da viagem em específico
     public void clearTravelLocationCache(UUID travelId) {
         String key = HASH_KEY_PREFIX + travelId;
 
