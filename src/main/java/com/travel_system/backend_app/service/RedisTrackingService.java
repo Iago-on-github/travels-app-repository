@@ -25,6 +25,8 @@ import java.util.UUID;
 @Service
 public class RedisTrackingService {
 
+    private final RouteCalculationService routeCalculationService;
+
     private final RedisTemplate<String, String> redisTemplate;
     private final HashOperations<String, String, String> hashOperations;
     private final TravelRepository travelRepository;
@@ -32,7 +34,8 @@ public class RedisTrackingService {
     private final String SET_KEY = "ACTIVE_TRAVELS_KEY";
     private final String HASH_KEY_PREFIX = "travelId:";
 
-    public RedisTrackingService(RedisTemplate<String, String> redisTemplate, TravelRepository travelRepository) {
+    public RedisTrackingService(RouteCalculationService routeCalculationService, RedisTemplate<String, String> redisTemplate, TravelRepository travelRepository) {
+        this.routeCalculationService = routeCalculationService;
         this.redisTemplate = redisTemplate;
         this.hashOperations = redisTemplate.opsForHash();
         this.travelRepository = travelRepository;
@@ -58,17 +61,38 @@ public class RedisTrackingService {
         String currentTimeStamp = String.valueOf(Instant.now().toEpochMilli());
         data.put("timestamp", currentTimeStamp);
 
+        Map<String, String> oldData = hashOperations.entries(key);
+
+        double totalUntilNow = 0;
+        if (!oldData.isEmpty()) {
+            double oldLat = Double.parseDouble(oldData.get("last_calc_lat"));
+            double oldLng = Double.parseDouble(oldData.get("last_calc_lng"));
+
+            Double distIncremental = routeCalculationService.calculateHaversineDistanceInMeters(Double.parseDouble(longitude), Double.parseDouble(latitude), oldLat, oldLng);
+
+            double previousAccumulated = Double.parseDouble(oldData.getOrDefault("accumulatedDistance", "0"));
+            totalUntilNow = previousAccumulated + distIncremental;
+        }
+
+        oldData.put("accumulatedDistance", String.valueOf(totalUntilNow));
         hashOperations.putAll(key, data);
+    }
+
+    // provê a distância acumulada armazeada no redis
+    public String getAccumulatedDistance(UUID travelId) {
+        if (travelId == null) return null;
+
+        String key = HASH_KEY_PREFIX + travelId;
+
+        String accumulatedDistance = hashOperations.get(key, "accumulatedDistance");
+
+        return accumulatedDistance != null ? accumulatedDistance : "0.0";
     }
 
     // retorna o último ETA armazenado + a distância
     public PreviousStateDTO getPreviousEta(String travelId) {
-        Travel travel = travelRepository.findById(UUID.fromString(travelId))
-                .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
-
-        String key = HASH_KEY_PREFIX + travel.getId();
-
-        if (travel.getId() == null) throw new TripNotFound("Id da viagem não encontrado " + travel.getId());
+        if (travelId == null) return null;
+        String key = HASH_KEY_PREFIX + travelId;
 
         String durationRemaining = hashOperations.get(key, "durationRemaining");
         String distance = hashOperations.get(key, "distanceRemaining");

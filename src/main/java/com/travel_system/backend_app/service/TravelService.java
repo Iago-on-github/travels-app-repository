@@ -16,6 +16,7 @@ import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -32,9 +33,10 @@ public class TravelService {
     private final MapboxAPIService mapboxAPIService;
     private final RedisTrackingService redisTrackingService;
     private final PermissionsRepository permissionsRepository;
+    private final TravelReportsRepository travelReportsRepository;
 
     @Autowired
-    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, PermissionsRepository permissionsRepository) {
+    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, PermissionsRepository permissionsRepository, TravelReportsRepository travelReportsRepository) {
         this.travelRepository = travelRepository;
         this.studentTravelRepository = studentTravelRepository;
         this.studentRepository = studentRepository;
@@ -42,6 +44,7 @@ public class TravelService {
         this.mapboxAPIService = mapboxAPIService;
         this.redisTrackingService = redisTrackingService;
         this.permissionsRepository = permissionsRepository;
+        this.travelReportsRepository = travelReportsRepository;
     }
 
     @Transactional
@@ -121,6 +124,22 @@ public class TravelService {
         });
 
         travelRepository.save(actualTrip);
+
+        Double accumulatedDistance = Double.valueOf(redisTrackingService.getAccumulatedDistance(travelId));
+        Duration durationInMinutes = Duration.between(actualTrip.getStartHourTravel(), actualTrip.getEndHourTravel());
+        double formattedDurationInMinutes = (double) durationInMinutes.toMinutes() / 60.0;
+
+        TravelReports travelReports = new TravelReports(
+                actualTrip.getId(),
+                actualTrip,
+                accumulatedDistance,
+                formattedDurationInMinutes,
+                actualTrip.getPolylineRoute(),
+                Instant.now()
+                );
+
+        travelReportsRepository.save(travelReports);
+
         redisTrackingService.clearTravelLocationCache(travelId);
     }
 
