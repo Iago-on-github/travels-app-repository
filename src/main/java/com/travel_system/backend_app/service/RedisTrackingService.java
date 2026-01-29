@@ -189,15 +189,6 @@ public class RedisTrackingService {
         hashOperations.put(key, "status", status);
     }
 
-    // chamada dentro de endtravel para remover todos os dados do redis.
-    public void deleteTrackingData(String travelId) {
-        String key = HASH_KEY_PREFIX + travelId;
-
-        if (travelId == null) throw new TripNotFound("Id da viagem não encontrado " + travelId);
-
-        redisTemplate.delete(key);
-    }
-
     // mantém memória entre os pings do driver
     public void keepMemoryBetweenDriverPings(UUID travelId, LiveLocationDTO driverPosition) {
         Travel travel = travelRepository.findById(travelId)
@@ -321,9 +312,12 @@ public class RedisTrackingService {
 
     // limpa os dados de cache do redis da viagem em específico
     public void clearTravelLocationCache(UUID travelId) {
+        if (travelId == null) return;
         String key = HASH_KEY_PREFIX + travelId;
 
         redisTemplate.delete(key);
+
+        redisTemplate.opsForSet().remove(SET_KEY, travelId.toString());
     }
 
     private void velocityAnalysisHelper(String key, String movementState, Map<String, String> data, String stateStartedAt, String lastNotificationSendAt, String lastEtaNotificationAt) {

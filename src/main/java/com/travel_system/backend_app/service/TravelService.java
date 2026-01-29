@@ -121,7 +121,7 @@ public class TravelService {
         });
 
         travelRepository.save(actualTrip);
-        redisTrackingService.deleteTrackingData(String.valueOf(travelId));
+        redisTrackingService.clearTravelLocationCache(travelId);
     }
 
     @Transactional
