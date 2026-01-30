@@ -3,6 +3,8 @@ package com.travel_system.backend_app.model;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 @Entity
@@ -18,17 +20,23 @@ public class TravelReports {
     @Column(columnDefinition = "text")
     private String actualPath;
     private Instant generatedAt;
+    private int busExpectedStudents;
+    private int busActualOccupancy;
+    private int occupancyPercentage;
 
     public TravelReports() {
     }
 
-    public TravelReports(UUID id, Travel travel, Double distanceTraveled, Double durationInMinutes, String actualPath, Instant generatedAt) {
+    public TravelReports(UUID id, Travel travel, Double distanceTraveled, Double durationInMinutes, String actualPath, Instant generatedAt, int busExpectedStudents, int busActualOccupancy, int occupancyPercentage) {
         this.id = id;
         this.travel = travel;
         this.distanceTraveled = distanceTraveled;
         this.durationInMinutes = durationInMinutes;
         this.actualPath = actualPath;
         this.generatedAt = generatedAt;
+        this.busExpectedStudents = busExpectedStudents;
+        this.busActualOccupancy = busActualOccupancy;
+        this.occupancyPercentage = occupancyPercentage;
     }
 
     public UUID getId() {
@@ -77,5 +85,29 @@ public class TravelReports {
 
     public void setGeneratedAt(Instant generatedAt) {
         this.generatedAt = generatedAt;
+    }
+
+    public int getBusExpectedStudents() {
+        return busExpectedStudents;
+    }
+
+    public void setBusExpectedStudents(int busExpectedStudents) {
+        this.busExpectedStudents = busExpectedStudents;
+    }
+
+    public int getBusActualOccupancy() {
+        return busActualOccupancy;
+    }
+
+    public void setBusActualOccupancy(int busActualOccupancy) {
+        this.busActualOccupancy = busActualOccupancy;
+    }
+
+    public int getOccupancyPercentage() {
+        return occupancyPercentage;
+    }
+
+    public void setOccupancyPercentage(int occupancyPercentage) {
+        this.occupancyPercentage = occupancyPercentage;
     }
 }

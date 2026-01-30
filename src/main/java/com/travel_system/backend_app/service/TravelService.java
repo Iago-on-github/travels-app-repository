@@ -112,8 +112,16 @@ public class TravelService {
         }
 
         actualTrip.setTravelStatus(TravelStatus.FINISH);
-
         actualTrip.setEndHourTravel(Instant.now());
+
+        int studentSize = actualTrip.getStudentTravels().size();
+        long totalOccupancy = actualTrip.getStudentTravels().stream()
+                .filter(student -> student.getEmbarkHour() != null).count();
+
+        long percentual = 0;
+        if (studentSize != 0 && totalOccupancy != 0) {
+            percentual = totalOccupancy * 100 / studentSize;
+        }
 
         actualTrip.getStudentTravels().forEach(studentTravel -> {
             if (studentTravel.isEmbark()) {
@@ -125,6 +133,7 @@ public class TravelService {
 
         travelRepository.save(actualTrip);
 
+        // COLETA  DE MÉTRICAS SOBRE A VIAGEM
         Double accumulatedDistance = Double.valueOf(redisTrackingService.getAccumulatedDistance(travelId));
         Duration durationInMinutes = Duration.between(actualTrip.getStartHourTravel(), actualTrip.getEndHourTravel());
         double formattedDurationInMinutes = (double) durationInMinutes.toMinutes() / 60.0;
@@ -135,7 +144,10 @@ public class TravelService {
                 accumulatedDistance,
                 formattedDurationInMinutes,
                 actualTrip.getPolylineRoute(),
-                Instant.now()
+                Instant.now(),
+                studentSize,
+                (int) totalOccupancy,
+                (int) percentual
                 );
 
         travelReportsRepository.save(travelReports);
