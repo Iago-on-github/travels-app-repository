@@ -8,21 +8,21 @@ import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
 
 import java.util.Set;
 import java.util.UUID;
-import java.util.concurrent.ThreadPoolExecutor;
 
 @Service
 public class SystemMetricsService {
-    private final ThreadPoolExecutor threadPoolExecutor;
+    private final ThreadPoolTaskExecutor threadPoolExecutor;
     private final RedisTrackingService redisTrackingService;
     private final TravelRepository travelRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(SystemMetricsService.class);
 
-    public SystemMetricsService(ThreadPoolExecutor threadPoolExecutor, RedisTrackingService redisTrackingService, TravelRepository travelRepository) {
+    public SystemMetricsService(ThreadPoolTaskExecutor threadPoolExecutor, RedisTrackingService redisTrackingService, TravelRepository travelRepository) {
         this.threadPoolExecutor = threadPoolExecutor;
         this.redisTrackingService = redisTrackingService;
         this.travelRepository = travelRepository;
@@ -35,7 +35,7 @@ public class SystemMetricsService {
         int CORE_POOL_SIZE = 5;
 
         int activeCount = threadPoolExecutor.getActiveCount();
-        int queueSize = threadPoolExecutor.getQueue().size();
+        int queueSize = threadPoolExecutor.getQueueSize();
         int poolSize = threadPoolExecutor.getPoolSize();
 
         int maxQueueEightyPercent = percentCalc(MAXIMUM_QUEUE_CAPACITY, 80);
