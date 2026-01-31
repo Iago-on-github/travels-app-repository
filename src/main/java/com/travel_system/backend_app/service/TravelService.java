@@ -131,8 +131,6 @@ public class TravelService {
             }
         });
 
-        travelRepository.save(actualTrip);
-
         // COLETA  DE MÉTRICAS SOBRE A VIAGEM
         Double accumulatedDistance = Double.valueOf(redisTrackingService.getAccumulatedDistance(travelId));
         Duration durationInMinutes = Duration.between(actualTrip.getStartHourTravel(), actualTrip.getEndHourTravel());
@@ -151,6 +149,8 @@ public class TravelService {
                 );
 
         travelReportsRepository.save(travelReports);
+
+        travelRepository.save(actualTrip);
 
         redisTrackingService.clearTravelLocationCache(travelId);
     }
