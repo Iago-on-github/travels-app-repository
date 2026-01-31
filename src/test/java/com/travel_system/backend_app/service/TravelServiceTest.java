@@ -17,6 +17,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.Instant;
 import java.util.Optional;
@@ -40,7 +41,7 @@ class TravelServiceTest {
     @InjectMocks
     private TravelService travelService;
 
-    private ArgumentCaptor<TravelReports> travelReportsCaptor = ArgumentCaptor.forClass(TravelReports.class);
+    private final ArgumentCaptor<TravelReports> travelReportsCaptor = ArgumentCaptor.forClass(TravelReports.class);
 
     @Nested
     class endTravel {
@@ -86,7 +87,68 @@ class TravelServiceTest {
         @Test
         @DisplayName("should validate the exactly percentual of occupancy")
         void shouldGeneratePartialOccupancyReport() {
+            Travel travel = new Travel();
 
+            travel.setId(UUID.randomUUID());
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+            travel.setStartHourTravel(Instant.now().minusSeconds(180));
+
+            Set<StudentTravel> studentTravels = Set.of(
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, null, null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, null, null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, null, null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, null, null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, null, null, null)
+            );
+
+            travel.setStudentTravels(studentTravels);
+
+            when(travelRepository.findById(travel.getId())).thenReturn(Optional.of(travel));
+            when(redisTrackingService.getAccumulatedDistance(travel.getId())).thenReturn("100.0");
+
+            travelService.endTravel(travel.getId());
+
+            verify(travelReportsRepository, times(1)).save(travelReportsCaptor.capture());
+
+            assertEquals(10, travelReportsCaptor.getValue().getBusExpectedStudents());
+            assertEquals(5, travelReportsCaptor.getValue().getBusActualOccupancy());
+            assertEquals(50, travelReportsCaptor.getValue().getOccupancyPercentage());
+
+            assertTrue(travel.getStudentTravels().stream().noneMatch(StudentTravel::isEmbark));
+        }
+
+        @Test
+        @DisplayName("should rollback if an error occurs and keep travel status unchanged")
+        void shouldRollbackWhenTravelReportsSaveFails() {
+            Travel travel = new Travel();
+
+            travel.setId(UUID.randomUUID());
+            travel.setTravelStatus(TravelStatus.TRAVELLING);
+            travel.setStartHourTravel(Instant.now());
+
+            Set<StudentTravel> studentTravels = Set.of(
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now(), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, Instant.now().minusSeconds(200), null, null),
+                    new StudentTravel(UUID.randomUUID(), travel, null, true, null, null, null)
+            );
+
+            travel.setStudentTravels(studentTravels);
+
+            when(travelRepository.findById(travel.getId())).thenReturn(Optional.of(travel));
+            doThrow(RuntimeException.class).when(travelReportsRepository).save(any());
+            when(redisTrackingService.getAccumulatedDistance(travel.getId())).thenReturn("100.0");
+
+            assertThrows(RuntimeException.class, () -> {
+                travelService.endTravel(travel.getId());
+            });
+
+            verify(redisTrackingService, never()).clearTravelLocationCache(any());
+            verify(travelRepository, never()).save(any());
         }
     }
 }
