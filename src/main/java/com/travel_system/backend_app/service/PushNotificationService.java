@@ -1,5 +1,7 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.events.StudentProximityEvents;
+import com.travel_system.backend_app.events.VehicleMovementEvents;
 import com.travel_system.backend_app.exceptions.TripNotFound;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
@@ -17,6 +19,7 @@ import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
@@ -34,28 +37,27 @@ public class PushNotificationService {
     private final TravelService travelService;
     private final RouteCalculationService routeCalculationService;
     private final RedisNotificationService redisNotificationService;
-    private final RabbitMQProducer rabbitMQProducer;
     private final RedisTrackingService redisTrackingService;
     private final TravelRepository travelRepository;
-    private final AsyncNotificationService asyncNotificationService;
+
+    private final ApplicationEventPublisher eventPublisher;
 
     private static final Logger logger = LoggerFactory.getLogger(PushNotificationService.class);
 
-    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RabbitMQProducer rabbitMQProducer, RedisTrackingService redisTrackingService, TravelRepository travelRepository, AsyncNotificationService asyncNotificationService) {
+    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RedisTrackingService redisTrackingService, TravelRepository travelRepository, ApplicationEventPublisher eventPublisher) {
         this.travelTrackingService = travelTrackingService;
         this.travelService = travelService;
         this.routeCalculationService = routeCalculationService;
         this.redisNotificationService = redisNotificationService;
-        this.rabbitMQProducer = rabbitMQProducer;
         this.redisTrackingService = redisTrackingService;
         this.travelRepository = travelRepository;
-        this.asyncNotificationService = asyncNotificationService;
+        this.eventPublisher = eventPublisher;
     }
 
     /*
-    gera pushs de notificações por distância <aluno - ônibus>
-    ex.: Ônibus está há 200M de você
-    */
+        gera pushs de notificações por distância <aluno - ônibus>
+        ex.: Ônibus está há 200M de você
+        */
     public void checkProximityAlerts(UUID travelId) {
         LiveLocationDTO driverPosition = travelTrackingService.getDriverPosition(travelId);
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
@@ -101,14 +103,15 @@ public class PushNotificationService {
             }
 
             if (shouldPushNotification) {
-                // manda evento ao rabbitMQ
-                rabbitMQProducer.sendMessage(new SendPackageDataToRabbitMQ(
+                // manda evento ao rabbitMQ via event
+                eventPublisher.publishEvent(new StudentProximityEvents(
                         travelId,
                         student.studentId(),
                         distance,
                         zone,
                         timestamp,
                         alertType));
+                logger.info("evento publicado para a viagem: {}", travelId);
 
                 // update no redis
                 redisNotificationService.updateNotificationState(travelId, student.studentId(),
@@ -128,8 +131,12 @@ public class PushNotificationService {
 
         ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis, traceId);
 
-        // chama para notificação
-        asyncNotificationService.processNotificationType(travelId, velocityAnalysis, decision, traceId);
+        // chama para notificação via event
+        eventPublisher.publishEvent(new VehicleMovementEvents(
+                travelId,
+                velocityAnalysis,
+                decision,
+                traceId));
 
         redisTrackingService.storeLastKnownState(String.valueOf(travelId), velocityAnalysis);
     }

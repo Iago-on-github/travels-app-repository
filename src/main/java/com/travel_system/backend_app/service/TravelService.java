@@ -32,18 +32,15 @@ public class TravelService {
     private final DriverRepository driverRepository;
     private final MapboxAPIService mapboxAPIService;
     private final RedisTrackingService redisTrackingService;
-    private final PermissionsRepository permissionsRepository;
     private final TravelReportsRepository travelReportsRepository;
 
-    @Autowired
-    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, PermissionsRepository permissionsRepository, TravelReportsRepository travelReportsRepository) {
+    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, TravelReportsRepository travelReportsRepository) {
         this.travelRepository = travelRepository;
         this.studentTravelRepository = studentTravelRepository;
         this.studentRepository = studentRepository;
         this.driverRepository = driverRepository;
         this.mapboxAPIService = mapboxAPIService;
         this.redisTrackingService = redisTrackingService;
-        this.permissionsRepository = permissionsRepository;
         this.travelReportsRepository = travelReportsRepository;
     }
 

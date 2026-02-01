@@ -27,7 +27,6 @@ public class TravelTrackingService {
     // usar no lugar de Instant.now() para ajudar nos testes unitários
     private final Clock clock;
 
-    @Autowired
     public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, StudentTravelRepository studentTravelRepository, Clock clock) {
         this.travelRepository = travelRepository;
         this.redisTrackingService = redisTrackingService;
