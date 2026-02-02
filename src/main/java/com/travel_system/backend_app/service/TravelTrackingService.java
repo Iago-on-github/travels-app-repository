@@ -1,7 +1,9 @@
 package com.travel_system.backend_app.service;
 
 import com.mapbox.geojson.Point;
+import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.listeners.LocationProcessingListener;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.*;
@@ -10,9 +12,11 @@ import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
 import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 
 @Service
@@ -24,16 +28,40 @@ public class TravelTrackingService {
     private final RouteCalculationService routeCalculationService;
     private final StudentTravelRepository studentTravelRepository;
 
+    private final ApplicationEventPublisher eventPublisher;
+
     // usar no lugar de Instant.now() para ajudar nos testes unitários
     private final Clock clock;
 
-    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, StudentTravelRepository studentTravelRepository, Clock clock) {
+    public TravelTrackingService(TravelRepository travelRepository, RedisTrackingService redisTrackingService, MapboxAPIService mapboxAPIService, RouteCalculationService routeCalculationService, StudentTravelRepository studentTravelRepository, ApplicationEventPublisher eventPublisher, Clock clock) {
         this.travelRepository = travelRepository;
         this.redisTrackingService = redisTrackingService;
         this.mapboxAPIService = mapboxAPIService;
         this.routeCalculationService = routeCalculationService;
         this.studentTravelRepository = studentTravelRepository;
+        this.eventPublisher = eventPublisher;
         this.clock = clock;
+    }
+
+    // Anota que o motorista passou pela localização atual e libera o celular o mais rápido possível
+    public void markDriverCheckpoint(String travelId, String latitude, String longitude) {
+        Travel travel = travelRepository.findById(UUID.fromString(travelId))
+                .orElseThrow(() -> new TripNotFound("Trip not found"));
+
+        if (travel.getTravelStatus() != TravelStatus.TRAVELLING) {
+            throw new TravelException("A viagem não está em andamento");
+        }
+
+        // salva no redis como última posição conhecida matendo a distance e o geometry antigos
+        LiveLocationDTO liveLocation = redisTrackingService.getLiveLocation(travelId);
+        String distance = String.valueOf(liveLocation.distance());
+        String geometry = liveLocation.geometry();
+
+        redisTrackingService.storeLiveLocation(travelId, latitude, longitude, distance, geometry);
+
+        // dispara evento de domínio
+        NewLocationReceivedEvents event = new NewLocationReceivedEvents(travelId, latitude, longitude, Instant.now(), travel.getTravelStatus());
+        eventPublisher.publishEvent(event);
     }
 
     // Orquestra o sistema de tracking em tempo real, verificando desvios de rota,

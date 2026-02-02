@@ -1,5 +1,6 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.events.StudentProximityEvents;
 import com.travel_system.backend_app.events.VehicleMovementEvents;
 import com.travel_system.backend_app.exceptions.TripNotFound;
@@ -32,7 +33,6 @@ import java.util.stream.Collectors;
 
 @Service
 public class PushNotificationService {
-
     private final TravelTrackingService travelTrackingService;
     private final TravelService travelService;
     private final RouteCalculationService routeCalculationService;
@@ -58,8 +58,8 @@ public class PushNotificationService {
         gera pushs de notificações por distância <aluno - ônibus>
         ex.: Ônibus está há 200M de você
         */
-    public void checkProximityAlerts(UUID travelId) {
-        LiveLocationDTO driverPosition = travelTrackingService.getDriverPosition(travelId);
+    public void checkProximityAlerts(UUID travelId, Double latitude, Double longitude) {
+        LiveLocationDTO driverPosition = new LiveLocationDTO(latitude, longitude, null, 0.0, null, null);
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
         List<DistanceResponseDTO> differencePosition = distanceBetweenPositions(travelId, driverPosition);
 
