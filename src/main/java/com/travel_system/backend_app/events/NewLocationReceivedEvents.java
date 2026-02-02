@@ -3,6 +3,12 @@ package com.travel_system.backend_app.events;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 
 import java.time.Instant;
+import java.util.UUID;
 
-public record NewLocationReceivedEvents(String travelId, String latitude, String longitude, Instant timestamp, TravelStatus status) {
+public record NewLocationReceivedEvents(
+        UUID travelId,
+        Double latitude,
+        Double longitude,
+        Instant timestamp,
+        TravelStatus status) {
 }

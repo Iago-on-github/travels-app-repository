@@ -7,6 +7,7 @@ import com.travel_system.backend_app.listeners.LocationProcessingListener;
 import com.travel_system.backend_app.model.StudentTravel;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.*;
+import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
@@ -44,8 +45,12 @@ public class TravelTrackingService {
     }
 
     // Anota que o motorista passou pela localização atual e libera o celular o mais rápido possível
-    public void markDriverCheckpoint(String travelId, String latitude, String longitude) {
-        Travel travel = travelRepository.findById(UUID.fromString(travelId))
+    public void markDriverCheckpoint(VehicleLocationRequestDTO vehicleLocationRequest) {
+        UUID travelId = vehicleLocationRequest.travelId();
+        Double latitude = vehicleLocationRequest.latitude();
+        Double longitude = vehicleLocationRequest.longitude();
+
+        Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new TripNotFound("Trip not found"));
 
         if (travel.getTravelStatus() != TravelStatus.TRAVELLING) {
@@ -53,14 +58,24 @@ public class TravelTrackingService {
         }
 
         // salva no redis como última posição conhecida matendo a distance e o geometry antigos
-        LiveLocationDTO liveLocation = redisTrackingService.getLiveLocation(travelId);
-        String distance = String.valueOf(liveLocation.distance());
-        String geometry = liveLocation.geometry();
+        LiveLocationDTO liveLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
 
-        redisTrackingService.storeLiveLocation(travelId, latitude, longitude, distance, geometry);
+        // Se liveLocation for null (primeiro ping)
+        String distance = (liveLocation != null) ? String.valueOf(liveLocation.distance()) : "0.0";
+        String geometry = (liveLocation != null) ? liveLocation.geometry() : null;
+
+        String strLatitude = String.valueOf(latitude);
+        String strLongitude = String.valueOf(longitude);
+        redisTrackingService.storeLiveLocation(String.valueOf(travelId), strLatitude, strLongitude, distance, geometry);
 
         // dispara evento de domínio
-        NewLocationReceivedEvents event = new NewLocationReceivedEvents(travelId, latitude, longitude, Instant.now(), travel.getTravelStatus());
+        NewLocationReceivedEvents event = new NewLocationReceivedEvents(
+                travelId,
+                latitude,
+                longitude,
+                Instant.now(),
+                travel.getTravelStatus());
+
         eventPublisher.publishEvent(event);
     }
 

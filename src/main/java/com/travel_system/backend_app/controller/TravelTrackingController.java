@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.controller;
 
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
+import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.service.TravelTrackingService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,5 +35,11 @@ public class TravelTrackingController {
     @GetMapping("/fastview/{travelId}")
     public ResponseEntity<LiveLocationDTO> getDriverPosition(@PathVariable UUID travelId) {
         return ResponseEntity.ok().body(travelTrackingService.getDriverPosition(travelId));
+    }
+
+    @PostMapping("/locationUpdate/{travelId}")
+    public ResponseEntity<Void> markDriverCheckpoint(@PathVariable UUID travelId, @RequestBody VehicleLocationRequestDTO vehicleLocationRequest) {
+        travelTrackingService.markDriverCheckpoint(vehicleLocationRequest);
+        return ResponseEntity.ok().build();
     }
 }

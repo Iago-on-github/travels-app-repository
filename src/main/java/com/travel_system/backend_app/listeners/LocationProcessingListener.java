@@ -22,15 +22,15 @@ public class LocationProcessingListener {
     @Async
     @EventListener
     public void handleLocationProcessing(NewLocationReceivedEvents locationReceivedEvents) {
-        UUID travelId = UUID.fromString(locationReceivedEvents.travelId());
-        Double latitude = Double.parseDouble(locationReceivedEvents.latitude());
-        Double longitude = Double.parseDouble(locationReceivedEvents.longitude());
+        UUID travelId = locationReceivedEvents.travelId();
+        Double latitude = locationReceivedEvents.latitude();
+        Double longitude = locationReceivedEvents.longitude();
 
         travelTrackingService.processNewLocation(travelId, latitude, longitude);
 
         // 2. Processa Alertas de Proximidade e Movimento (O "cérebro" das notificações)
         // Note: o checkProximityAlerts agora será disparado a cada novo ping de GPS
         pushNotificationService.checkProximityAlerts(travelId, latitude, longitude);
-        pushNotificationService.processVehicleMovement(travelId);
+        pushNotificationService.processVehicleMovement(travelId, latitude, longitude);
     }
 }

@@ -57,7 +57,7 @@ public class PushNotificationService {
     /*
         gera pushs de notificações por distância <aluno - ônibus>
         ex.: Ônibus está há 200M de você
-        */
+    */
     public void checkProximityAlerts(UUID travelId, Double latitude, Double longitude) {
         LiveLocationDTO driverPosition = new LiveLocationDTO(latitude, longitude, null, 0.0, null, null);
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
@@ -124,10 +124,10 @@ public class PushNotificationService {
 
     }
 
-    public void processVehicleMovement(UUID travelId) {
+    public void processVehicleMovement(UUID travelId, Double latitude, Double longitude) {
         UUID traceId = UUID.randomUUID();
         logger.info("[Trace: {}] Iniciando processamento para viagem: {}", traceId, travelId);
-        VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(travelId);
+        VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(travelId, latitude, longitude);
 
         ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis, traceId);
 
@@ -193,14 +193,12 @@ public class PushNotificationService {
     gera pushs de notificações por anomalias (detector de problemas) <aluno - ônibus>
     ex.: Ônibus está há 12 minutos parado
     */
-    private VelocityAnalysisDTO analyzeVehicleMovement(UUID travelId) {
+    private VelocityAnalysisDTO analyzeVehicleMovement(UUID travelId, Double latitude, Double longitude) {
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new TripNotFound("Viagem não encontrada. " + travelId));
 
-        LiveLocationDTO actuallyPosition =
-                redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
-        LastLocationDTO lastLocation =
-                redisTrackingService.getLastLocation(String.valueOf(travel.getId()));
+        LiveLocationDTO lastRecentPosition = redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
+        LastLocationDTO lastLocation = redisTrackingService.getLastLocation(String.valueOf(travel.getId()));
 
         VelocityAnalysisDTO result;
 
@@ -220,7 +218,7 @@ public class PushNotificationService {
             else {
                 Double distanceBetweenPings =
                         routeCalculationService.calculateHaversineDistanceInMeters(
-                                actuallyPosition.longitude(), actuallyPosition.latitude(),
+                                longitude, latitude,
                                 lastLocation.longitude(), lastLocation.latitude());
 
                 final int MIN_SOLID_SPEED_DISTANCE = 5;
@@ -277,9 +275,26 @@ public class PushNotificationService {
             }
         }
 
+        LiveLocationDTO actuallyPosition = getLiveLocationDTO(latitude, longitude, lastRecentPosition);
+
         redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
 
         return result;
+    }
+
+    private LiveLocationDTO getLiveLocationDTO(Double latitude, Double longitude, LiveLocationDTO lastRecentPosition) {
+        String geometry = lastRecentPosition != null ? lastRecentPosition.geometry() : null;
+        double distance = lastRecentPosition != null ? lastRecentPosition.distance() : 0.0;
+        double lastCalcLat = lastRecentPosition != null ? lastRecentPosition.lastCalcLat() : 0.0;
+        double lastCalcLng = lastRecentPosition != null ? lastRecentPosition.lastCalcLng() : 0.0;
+
+        return new LiveLocationDTO(
+                latitude,
+                longitude,
+                geometry,
+                distance,
+                lastCalcLat,
+                lastCalcLng);
     }
 
     // distance between driver and student
