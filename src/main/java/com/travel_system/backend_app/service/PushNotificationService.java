@@ -301,7 +301,16 @@ public class PushNotificationService {
     protected List<DistanceResponseDTO> distanceBetweenPositions(UUID travelId, LiveLocationDTO driverPosition) {
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);
 
-        return linkedStudentTravel.stream()
+        logger.info("Viagem {}: Iniciando cálculo de distância para {} alunos vinculados.", travelId, linkedStudentTravel.size());
+
+        List<DistanceResponseDTO> results = linkedStudentTravel.stream()
+                .filter(student -> {
+                    boolean hasPosition = student.position() != null;
+                    if (!hasPosition) {
+                        logger.warn("Aluno {} ignorado: Posição (GeoPosition) está nula no banco.", student.studentId());
+                    }
+                    return hasPosition;
+                })
                 .map(student -> {
                     double distance = routeCalculationService.calculateHaversineDistanceInMeters(
                             driverPosition.latitude(),
@@ -312,5 +321,7 @@ public class PushNotificationService {
                     return new DistanceResponseDTO(student.studentId(), distance);
                 })
                 .toList();
+        logger.info("Viagem {}: Cálculo concluído. {} alunos processados com sucesso.", travelId, results.size());
+        return results;
     }
 }

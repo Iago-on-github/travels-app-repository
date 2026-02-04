@@ -113,7 +113,7 @@ public class RedisTrackingService {
         Map<String, String> data = hashOperations.entries(key);
 
         if (data == null || data.isEmpty()) {
-            throw new TripNotFound("Dados de rastramento em tempo real não encontrados");
+            return null;
         }
 
         // última posição
@@ -128,20 +128,16 @@ public class RedisTrackingService {
         String lastCalcLat = data.get("last_calc_lat");
         String lastCalcLng = data.get("last_calc_lng");
 
-        if (latitude == null || longitude == null) {
-            throw new NoSuchCoordinates("Latitude/Longitude atuais não encontradas");
-        }
-
         try {
             return new LiveLocationDTO(
-                    Double.parseDouble(latitude),
-                    Double.parseDouble(longitude),
+                    latitude != null ? Double.parseDouble(latitude) : 0.0,
+                    longitude != null ? Double.parseDouble(longitude) : 0.0,
                     geometry,
                     distance != null ? Double.parseDouble(distance) : 0.0,
                     lastCalcLat != null ? Double.parseDouble(lastCalcLat) : null,
                     lastCalcLng != null ? Double.parseDouble(lastCalcLng) : null);
         } catch (NumberFormatException e) {
-            throw new NoSuchCoordinates("Dados de coordenadas corrompidos ou inválidos. " + e.getMessage());
+            return null;
         }
     }
 

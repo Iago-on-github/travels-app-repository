@@ -30,6 +30,7 @@ public class SecurityConfig {
                         auth.requestMatchers("/auth/signing").permitAll()
                                 .requestMatchers("/auth/refresh").permitAll()
                                 .requestMatchers("/admins/**").hasRole("ADMIN")
+                                .requestMatchers("/travel/tracking/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .cors(AbstractHttpConfigurer::disable)
