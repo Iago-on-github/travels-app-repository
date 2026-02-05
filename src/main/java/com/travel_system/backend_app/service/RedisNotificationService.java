@@ -41,7 +41,7 @@ public class RedisNotificationService {
 
     // verification
     public Boolean verifyNotificationState(UUID travelId, UUID studentId, Double currentDistanceMeters, NotificationStateDTO state) {
-        if (state == null || state.zone().isEmpty()) return true;
+        if (state == null || state.zone() == null || state.zone().isEmpty()) return true;
 
         // se nao hoyver ultima notificação confiável, notifica
         if (state.lastNotificationAt() == null || state.lastNotificationAt().isEmpty() || state.lastNotificationAt().isBlank()) {
@@ -52,8 +52,7 @@ public class RedisNotificationService {
         double step;
 
         long timeToNotify = 720000L;
-        long elapsedTime = Instant.now().toEpochMilli() - Integer.parseInt(state.lastNotificationAt());
-
+        long elapsedTime = Instant.now().toEpochMilli() - Long.parseLong(state.lastNotificationAt());
         if (currentDistanceMeters >= 1000) {
             currentZone = "FAR";
             step = 200.0;

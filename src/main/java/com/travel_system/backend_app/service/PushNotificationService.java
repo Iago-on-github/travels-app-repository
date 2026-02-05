@@ -70,8 +70,10 @@ public class PushNotificationService {
             NotificationStateDTO readNotificationState = redisNotificationService.readNotificationState(travelId, student.studentId());
 
             Double distance = distances.get(student.studentId());
+            if (distance == null) return; // Segurança caso o aluno não tenha distância calculada
+
             String zone = distance >= 1000 ? "FAR" : "NEAR";
-            String lastNotificationAt = String.valueOf(Instant.now().toEpochMilli());
+            String nowMillis = String.valueOf(Instant.now().toEpochMilli());
             String timestamp = String.valueOf(Instant.now());
 
             Boolean shouldPushNotification = redisNotificationService.verifyNotificationState(
@@ -80,30 +82,38 @@ public class PushNotificationService {
                     distance,
                     readNotificationState);
 
-            String alertType = "";
+            String alertType = "INITIAL_STATE";
 
-            // seta o alertyType
-            if (!zone.equals(readNotificationState.zone())) {
-                alertType = "ZONE_CHANGED";
-            } else {
-                long elapsedMinutes = Instant.parse(lastNotificationAt).toEpochMilli()
-                        - Instant.parse(readNotificationState.lastNotificationAt()).toEpochMilli();
-
-                if (elapsedMinutes >= 720000) {
-                    alertType = "TIME_ELAPSED";
+            if (readNotificationState != null && readNotificationState.zone() != null) {
+                // Se a zona mudou
+                if (!zone.equals(readNotificationState.zone())) {
+                    alertType = "ZONE_CHANGED";
                 } else {
-                    double lastDistance = Double.parseDouble(readNotificationState.lastDistanceNotified());
-                    double deltaDistance = Math.abs(distance - lastDistance);
+                    // Se a zona é a mesma, verifica-se o tempo ou distância percorrida
+                    try {
+                        long lastTime = Long.parseLong(readNotificationState.lastNotificationAt());
+                        long elapsedMillis = Instant.now().toEpochMilli() - lastTime;
 
-                    double step = zone.equals("FAR") ? 200.0 : 30.0;
-                    if (deltaDistance >= step) {
-                        alertType = "DISTANCE_STEP_REACHED";
+                        if (elapsedMillis >= 720000) { // 12 minutos
+                            alertType = "TIME_ELAPSED";
+                        } else {
+                            double lastDistance = Double.parseDouble(readNotificationState.lastDistanceNotified());
+                            double deltaDistance = Math.abs(distance - lastDistance);
+                            double step = zone.equals("FAR") ? 200.0 : 30.0;
+
+                            if (deltaDistance >= step) {
+                                alertType = "DISTANCE_STEP_REACHED";
+                            } else {
+                                alertType = "PERIODIC_UPDATE"; // Caso passe no verify mas não mude zona/step
+                            }
+                        }
+                    } catch (Exception e) {
+                        alertType = "STATE_RECOVERY"; // Caso o dado no Redis esteja corrompido
                     }
                 }
             }
 
             if (shouldPushNotification) {
-                // manda evento ao rabbitMQ via event
                 eventPublisher.publishEvent(new StudentProximityEvents(
                         travelId,
                         student.studentId(),
@@ -111,17 +121,16 @@ public class PushNotificationService {
                         zone,
                         timestamp,
                         alertType));
-                logger.info("evento publicado para a viagem: {}", travelId);
 
-                // update no redis
+                logger.info("Evento publicado [{}]: aluno {} na viagem {}", alertType, student.studentId(), travelId);
+
                 redisNotificationService.updateNotificationState(travelId, student.studentId(),
                         new NotificationStateDTO(zone,
                                 distance.toString(),
-                                lastNotificationAt,
+                                nowMillis,
                                 timestamp));
             }
         });
-
     }
 
     public void processVehicleMovement(UUID travelId, Double latitude, Double longitude) {
