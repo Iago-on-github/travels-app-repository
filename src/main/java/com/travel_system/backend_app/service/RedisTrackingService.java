@@ -11,6 +11,8 @@ import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.repository.TravelRepository;
 import io.micrometer.common.util.StringUtils;
 import jakarta.persistence.EntityNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -30,6 +32,8 @@ public class RedisTrackingService {
     private final RedisTemplate<String, String> redisTemplate;
     private final HashOperations<String, String, String> hashOperations;
     private final TravelRepository travelRepository;
+
+    private final Logger logger = LoggerFactory.getLogger(RedisTrackingService.class);
 
     private final String SET_KEY = "ACTIVE_TRAVELS_KEY";
     private final String HASH_KEY_PREFIX = "travelId:";
@@ -157,14 +161,21 @@ public class RedisTrackingService {
         if (timestamp == null) return null;
         else {
             if (lastPingLat == null || lastPingLng == null || timestamp.isEmpty()) {
-                throw new NoFoundPositionException("Últimos dados de latitude, longitude ou timestamp inválidos ou corrompidos");
+                // retorna null para tratar como primeiro ping
+                return null;
             }
 
-            double LastPingLatToDouble = Double.parseDouble(lastPingLat);
-            double LastPingLngToDouble = Double.parseDouble(lastPingLng);
-            long timestampToLong = Long.parseLong(timestamp);
+            try {
+                double LastPingLatToDouble = Double.parseDouble(lastPingLat);
+                double LastPingLngToDouble = Double.parseDouble(lastPingLng);
+                long timestampToLong = Long.parseLong(timestamp);
 
-            return new LastLocationDTO(LastPingLatToDouble, LastPingLngToDouble, timestampToLong);
+                logger.info("Dados da última loc registrada retornados com sucesso: {}", travelId);
+                return new LastLocationDTO(LastPingLatToDouble, LastPingLngToDouble, timestampToLong);
+            } catch (NumberFormatException e) {
+                logger.warn("Dados de localização corrompidos no Redis para a viagem: {}", travelId);
+                return null;
+            }
         }
     }
 
