@@ -2,6 +2,7 @@ package com.travel_system.backend_app.listeners;
 
 import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.model.Travel;
+import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
 import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.service.PushNotificationService;
 import com.travel_system.backend_app.service.TravelTrackingService;
@@ -37,11 +38,11 @@ public class LocationProcessingListener {
         Travel travel = travelRepository.findByIdWithStudents(travelId)
                 .orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
 
-        travelTrackingService.processNewLocation(travel.getId(), latitude, longitude);
+        travelTrackingService.processNewLocation(new VehicleLocationRequestDTO(travelId, latitude, longitude));
 
         // 2. Processa Alertas de Proximidade e Movimento (O "cérebro" das notificações)
         // Note: o checkProximityAlerts agora será disparado a cada novo ping de GPS
-        pushNotificationService.checkProximityAlerts(travel.getId(), latitude, longitude);
-        pushNotificationService.processVehicleMovement(travel.getId(), latitude, longitude);
+        pushNotificationService.checkProximityAlerts(new VehicleLocationRequestDTO(travelId, latitude, longitude));
+        pushNotificationService.processVehicleMovement(new VehicleLocationRequestDTO(travelId, latitude, longitude));
     }
 }

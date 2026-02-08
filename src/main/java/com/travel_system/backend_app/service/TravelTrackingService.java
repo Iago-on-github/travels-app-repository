@@ -81,7 +81,11 @@ public class TravelTrackingService {
 
     // Orquestra o sistema de tracking em tempo real, verificando desvios de rota,
     // recalculando o ETA e salvando a localização e os metadados da viagem no Redis
-    public void processNewLocation(UUID travelId, Double currentLat, Double currentLng) {
+    public void processNewLocation(VehicleLocationRequestDTO vehicleLocationRequest) {
+        UUID travelId = vehicleLocationRequest.travelId();
+        Double currentLat = vehicleLocationRequest.latitude();
+        Double currentLng = vehicleLocationRequest.longitude();
+
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new TripNotFound("Trip not found"));
 

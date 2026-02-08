@@ -274,14 +274,13 @@ public class RedisTrackingService {
     }
 
     // persiste e mantém coerente o estado de movimento do veículo ao logo do tempo
-    public void storeLastKnownState(String travelId, VelocityAnalysisDTO velocityAnalysis) {
-        Travel travel = travelRepository.findById(UUID.fromString(travelId)).orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada"));
-
+    public void storeLastKnownState(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
+        // trata como first ping se não existir registo no redis
         if (velocityAnalysis == null || velocityAnalysis.movementState() == null) {
-            throw new EtaDataStatesInvalidException("Dados do estado ETA inválidos ou corrompidos");
+            return;
         }
 
-        String key = HASH_KEY_PREFIX + travel.getId();
+        String key = HASH_KEY_PREFIX + travelId;
 
         String movementState = String.valueOf(velocityAnalysis.movementState());
         String stateStartedAt = String.valueOf(Instant.now());

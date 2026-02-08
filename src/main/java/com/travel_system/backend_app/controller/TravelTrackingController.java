@@ -21,8 +21,8 @@ public class TravelTrackingController {
     }
 
     @GetMapping("/{travelId}/location")
-    public ResponseEntity<Void> processNewLocation(@PathVariable UUID travelId, @RequestParam Double lat, @RequestParam Double lng) {
-        travelTrackingService.processNewLocation(travelId, lat, lng);
+    public ResponseEntity<Void> processNewLocation(@PathVariable UUID travelId, @RequestBody VehicleLocationRequestDTO vehicleLocationRequest) {
+        travelTrackingService.processNewLocation(vehicleLocationRequest);
         return ResponseEntity.noContent().build();
     }
 
