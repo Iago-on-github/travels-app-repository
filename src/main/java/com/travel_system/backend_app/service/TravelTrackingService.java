@@ -61,7 +61,7 @@ public class TravelTrackingService {
         LiveLocationDTO liveLocation = redisTrackingService.getLiveLocation(String.valueOf(travelId));
 
         // Se liveLocation for null (primeiro ping)
-        String distance = (liveLocation != null) ? String.valueOf(liveLocation.distance()) : "0.0";
+        Double distance = (liveLocation != null) ? liveLocation.distance() : null;
         String geometry = (liveLocation != null) ? liveLocation.geometry() : null;
 
         String strLatitude = String.valueOf(latitude);
@@ -141,7 +141,7 @@ public class TravelTrackingService {
                 travel.getId().toString(),
                 currentLat.toString(),
                 currentLng.toString(),
-                currentDuration.toString(),
+                currentDuration,
                 currentPolyline);
 
         redisTrackingService.storeTravelMetadata(
@@ -205,7 +205,7 @@ public class TravelTrackingService {
                     String.valueOf(travelId),
                     String.valueOf(lastCalcLatitude),
                     String.valueOf(lastCalcLongitude),
-                    String.valueOf(distance),
+                    distance,
                     geometry);
         }
 

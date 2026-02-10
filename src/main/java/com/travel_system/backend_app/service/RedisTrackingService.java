@@ -18,10 +18,9 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.Instant;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 
 @Service
@@ -46,15 +45,15 @@ public class RedisTrackingService {
     }
 
     // armazena a localização mais recente do motorista em cache com redisTemplate
-    public void storeLiveLocation(String travelId, String latitude, String longitude, String distance, String geometry) {
-        String key = HASH_KEY_PREFIX + travelId;
-
+    public void storeLiveLocation(String travelId, String latitude, String longitude, Double distance, String geometry) {
         if (travelId == null) throw new TripNotFound("Id da viagem não encontrado " + travelId);
+
+        String key = HASH_KEY_PREFIX + travelId;
 
         Map<String, String> data = new HashMap<>();
 
         // dados cache
-        data.put("distanceRemaining", distance);
+        data.put("distanceRemaining", distance.toString());
         data.put("geometry", geometry);
 
         // ponto de referência de onde a rota foi calculada
@@ -65,21 +64,34 @@ public class RedisTrackingService {
         String currentTimeStamp = String.valueOf(Instant.now().toEpochMilli());
         data.put("timestamp", currentTimeStamp);
 
-        Map<String, String> oldData = hashOperations.entries(key);
+        List<String> fields = Arrays.asList("last_calc_lat", "last_calc_lng", "accumulatedDistance");
+        List<String> values = hashOperations.multiGet(key, fields);
 
-        double totalUntilNow = 0;
-        if (!oldData.isEmpty()) {
-            double oldLat = Double.parseDouble(oldData.get("last_calc_lat"));
-            double oldLng = Double.parseDouble(oldData.get("last_calc_lng"));
+        Map<String, String> oldData = IntStream.range(0, fields.size())
+                .filter(i -> values.get(0) != null).boxed()
+                .collect(Collectors.toMap(
+                        fields::get,
+                        values::get
+                ));
 
-            Double distIncremental = routeCalculationService.calculateHaversineDistanceInMeters(Double.parseDouble(longitude), Double.parseDouble(latitude), oldLat, oldLng);
+        try {
+            double totalUntilNow = 0;
+            if (!oldData.isEmpty()) {
+                double oldLat = Double.parseDouble(oldData.get("last_calc_lat"));
+                double oldLng = Double.parseDouble(oldData.get("last_calc_lng"));
 
-            double previousAccumulated = Double.parseDouble(oldData.getOrDefault("accumulatedDistance", "0"));
-            totalUntilNow = previousAccumulated + distIncremental;
+                Double distIncremental = routeCalculationService.calculateHaversineDistanceInMeters(Double.parseDouble(longitude), Double.parseDouble(latitude), oldLat, oldLng);
+
+                double previousAccumulated = Double.parseDouble(oldData.getOrDefault("accumulatedDistance", "0"));
+                totalUntilNow = previousAccumulated + distIncremental;
+
+                data.put("accumulatedDistance", String.valueOf(totalUntilNow));
+            }
+
+            hashOperations.putAll(key, data);
+        } catch (Exception e) {
+            logger.warn("Dados de distância da viagem corrompidos ou inválidos: {}", travelId);
         }
-
-        oldData.put("accumulatedDistance", String.valueOf(totalUntilNow));
-        hashOperations.putAll(key, data);
     }
 
     // provê a distância acumulada armazeada no redis
@@ -146,11 +158,8 @@ public class RedisTrackingService {
     }
 
     // fornece a última loc registrada - estado de localização (antes da loc mais recente)
-    public LastLocationDTO getLastLocation(String travelId) {
-        Travel travel = travelRepository.findById(UUID.fromString(travelId))
-                .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
-
-        String key = HASH_KEY_PREFIX + travel.getId();
+    public LastLocationDTO getLastLocation(UUID travelId) {
+        String key = HASH_KEY_PREFIX + travelId;
 
         // read hash
         String lastPingLat = hashOperations.get(key, "last_ping_lat");
@@ -222,34 +231,19 @@ public class RedisTrackingService {
 
     // mantém memória entre os pings do driver
     public void keepMemoryBetweenDriverPings(UUID travelId, LiveLocationDTO driverPosition) {
-        Travel travel = travelRepository.findById(travelId)
-                .orElseThrow(() -> new TripNotFound("Viagem não encontrada: " + travelId));
-        String now = String.valueOf(Instant.now());
+        long now = Instant.now().toEpochMilli();
 
-        String key = HASH_KEY_PREFIX + travel.getId();
+        String key = HASH_KEY_PREFIX + travelId;
 
         Map<String, String> data = hashOperations.entries(key);
 
-        // read stats
-        String lastPingTimestamp = data.get("timestamp");
+        data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
+        data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
+        data.put("timestamp", String.valueOf(now));
 
-//        String lastPingLat = data.get("last_ping_lat");
-//        String lastPingLng = data.get("last_ping_lng");
+        logger.info("[keepMemoryBetweenDriverPings] Com estado, salvando...: {}", travelId);
 
-        // if without state
-        if (lastPingTimestamp == null) {
-            data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
-            data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
-            data.put("timestamp", now);
-
-            hashOperations.putAll(key, data);
-        } else {
-            data.put("last_ping_lat", String.valueOf(driverPosition.latitude()));
-            data.put("last_ping_lng", String.valueOf(driverPosition.longitude()));
-            data.put("timestamp", now);
-
-            hashOperations.putAll(key, data);
-        }
+        hashOperations.putAll(key, data);
     }
 
     // atualiza o estado de ETA da viagem

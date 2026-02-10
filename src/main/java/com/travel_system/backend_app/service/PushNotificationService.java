@@ -216,11 +216,12 @@ public class PushNotificationService {
         Double latitude = vehicleLocationRequest.latitude();
         Double longitude = vehicleLocationRequest.longitude();
 
-        Travel travel = travelRepository.findById(travelId)
-                .orElseThrow(() -> new TripNotFound("Viagem não encontrada. " + travelId));
+        LiveLocationDTO lastRecentPosition = redisTrackingService.getLiveLocation(String.valueOf(travelId));
+        LastLocationDTO lastLocation = redisTrackingService.getLastLocation(travelId);
+        LiveLocationDTO actuallyPosition = getLiveLocationDTO(latitude, longitude, lastRecentPosition);
 
-        LiveLocationDTO lastRecentPosition = redisTrackingService.getLiveLocation(String.valueOf(travel.getId()));
-        LastLocationDTO lastLocation = redisTrackingService.getLastLocation(String.valueOf(travel.getId()));
+        // atualiza última posição no redis mesmo se algo falhar
+        redisTrackingService.keepMemoryBetweenDriverPings(travelId, actuallyPosition);
 
         VelocityAnalysisDTO result;
 
@@ -251,22 +252,17 @@ public class PushNotificationService {
         }
 
         PreviousStateDTO previousEta =
-                redisTrackingService.getPreviousEta(String.valueOf(travel.getId()));
+                redisTrackingService.getPreviousEta(String.valueOf(travelId));
 
-        if (previousEta == null || previousEta.distanceRemaining() == null) {
-            return new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
-        }
-
-        double distanceRemaining = previousEta.distanceRemaining();
-        if (distanceRemaining <= 0 || distanceRemaining < distanceBetweenPings) {
-            return new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
-        }
-
+        Double newETA = null;
+        double distanceRemaining = 0;
+        MovementState state;
         double avgSpeed = distanceBetweenPings / elapsedSeconds;
         final double MIN_SPEED_THRESHOLD = 0.5;
 
-        Double newETA = null;
-        MovementState state;
+        if (previousEta != null) {
+            distanceRemaining = previousEta.distanceRemaining();
+        }
 
         if (avgSpeed == 0) {
             state = MovementState.STOPPED;
@@ -274,10 +270,11 @@ public class PushNotificationService {
             state = MovementState.SLOW;
         } else {
             state = MovementState.NORMAL;
-            if (previousEta.durationRemaining() != null) {
+            if (distanceRemaining > 0 && avgSpeed > MIN_SPEED_THRESHOLD) {
                 newETA = distanceRemaining / avgSpeed;
+
                 redisTrackingService.updateTripEtaState(
-                        travel.getId(),
+                        travelId,
                         distanceRemaining,
                         newETA,
                         Instant.now()
@@ -292,10 +289,6 @@ public class PushNotificationService {
                 newETA,
                 state
         );
-
-        LiveLocationDTO actuallyPosition = getLiveLocationDTO(latitude, longitude, lastRecentPosition);
-
-        redisTrackingService.keepMemoryBetweenDriverPings(travel.getId(), actuallyPosition);
 
         return result;
     }
