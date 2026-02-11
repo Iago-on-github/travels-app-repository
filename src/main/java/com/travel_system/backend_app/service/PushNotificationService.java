@@ -264,6 +264,9 @@ public class PushNotificationService {
             distanceRemaining = previousEta.distanceRemaining();
         }
 
+        logger.info("[ANALYSIS DEBUG] Travel: {} | Elapsed: {}s | Distance: {}m | Speed: {}m/s | Threshold: {}m/s | Lat/Lng: {} , {}",
+                travelId, elapsedSeconds, String.format("%.2f", distanceBetweenPings), String.format("%.2f", avgSpeed), MIN_SPEED_THRESHOLD, latitude, longitude);
+
         if (avgSpeed == 0) {
             state = MovementState.STOPPED;
         } else if (avgSpeed <= MIN_SPEED_THRESHOLD) {

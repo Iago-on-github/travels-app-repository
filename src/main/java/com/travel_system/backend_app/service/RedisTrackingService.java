@@ -80,7 +80,8 @@ public class RedisTrackingService {
                 double oldLat = Double.parseDouble(oldData.get("last_calc_lat"));
                 double oldLng = Double.parseDouble(oldData.get("last_calc_lng"));
 
-                Double distIncremental = routeCalculationService.calculateHaversineDistanceInMeters(Double.parseDouble(longitude), Double.parseDouble(latitude), oldLat, oldLng);
+                Double distIncremental = routeCalculationService.calculateHaversineDistanceInMeters(
+                        Double.parseDouble(longitude), Double.parseDouble(latitude), oldLat, oldLng);
 
                 double previousAccumulated = Double.parseDouble(oldData.getOrDefault("accumulatedDistance", "0"));
                 totalUntilNow = previousAccumulated + distIncremental;
@@ -113,6 +114,8 @@ public class RedisTrackingService {
         String durationRemaining = hashOperations.get(key, "durationRemaining");
         String distance = hashOperations.get(key, "distanceRemaining");
         String timestampLastPing = hashOperations.get(key, "timestamp");
+
+        logger.info("[getPreviousETA] - durationRemaining: {} {} {}", durationRemaining + " distance: ", distance + " timestampLastPing: ", timestampLastPing );
 
         return new PreviousStateDTO(
                 durationRemaining != null ? Double.parseDouble(durationRemaining) : null,
@@ -217,15 +220,15 @@ public class RedisTrackingService {
     }
 
     // atualiza ETA restante, distância restante e o status atualizado
-    public void storeTravelMetadata(String travelId, String durationRemaining, String distance, String status) {
+    public void storeTravelMetadata(String travelId, Double durationRemaining, Double distance, String status) {
         String key = HASH_KEY_PREFIX + travelId;
 
         if (travelId == null) throw new TripNotFound("Id da viagem não encontrado " + travelId);
 
         // HSET: vai atualizar os campos de distance, eta e status sem afetar LAT/LNG
-        hashOperations.put(key, "durationRemaining", durationRemaining);
+        hashOperations.put(key, "durationRemaining", durationRemaining.toString());
         hashOperations.put(key, "timestamp", String.valueOf(Instant.now().toEpochMilli()));
-        hashOperations.put(key, "distanceRemaining", distance);
+        hashOperations.put(key, "distanceRemaining", distance.toString());
         hashOperations.put(key, "status", status);
     }
 

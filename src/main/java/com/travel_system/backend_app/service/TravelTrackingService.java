@@ -146,8 +146,8 @@ public class TravelTrackingService {
 
         redisTrackingService.storeTravelMetadata(
                 travel.getId().toString(),
-                currentPolyline,
-                currentDistance.toString(),
+                currentDuration,
+                currentDistance,
                 travel.getTravelStatus().toString()
         );
     }
