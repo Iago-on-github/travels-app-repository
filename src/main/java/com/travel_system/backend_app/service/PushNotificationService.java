@@ -165,10 +165,12 @@ public class PushNotificationService {
         AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(String.valueOf(travelId));
         MovementState actualMovementState = velocityAnalysis.movementState();
 
-        // primeiro ciclo: não notificar
-        if (lastMovementState == null || lastMovementState.movementState() == null || lastMovementState.stateStartedAt() == null || lastMovementState.lastNotificationSendAt() == null) {
-            logger.info("[Trace: {}] Decisão: Não notificar", traceId);
-            return ShouldNotify.SHOULD_NO_NOTIFY;
+        // primeiro ciclo: sem estado anterior - seta posição atual como a antiga position registrada
+        MovementState movementState;
+        if (lastMovementState == null || lastMovementState.movementState() == null) {
+            movementState = actualMovementState;
+        } else {
+            movementState = lastMovementState.movementState();
         }
 
         Instant now = Instant.now();
@@ -177,29 +179,39 @@ public class PushNotificationService {
         final long NOTIFICATION_COOLDOWN_MS = 12_000;
         final long NOTIFICATION_COOLDOWN_MS_STOPPED = 300_000;
 
+        Instant lastEtaNotifyAt = (lastMovementState != null) ? lastMovementState.lastEtaNotificationAt() : null;
+
         // comparar estados
-        // se o estado mudou, ainda nao notifica
-        if (!actualMovementState.equals(lastMovementState.movementState())) {
+        // se o estado mudou, ainda nao notifica mas salva a mudança no Redis
+        if (!actualMovementState.equals(movementState)) {
+            logger.info("Estado mudou, ainda não notifica e salva o estado no Redis");
+            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, now , lastEtaNotifyAt, lastEtaNotifyAt));
             return ShouldNotify.SHOULD_NO_NOTIFY;
         }
 
         if (actualMovementState.equals(MovementState.NORMAL)) {
+            logger.info("Estado não mudou, não notifica");
+            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, now , lastEtaNotifyAt, lastEtaNotifyAt));
             return ShouldNotify.SHOULD_NO_NOTIFY;
         }
 
-        long durationOnState = now.toEpochMilli() - lastMovementState.stateStartedAt().toEpochMilli();
-        long timeSinceLastNotification = now.toEpochMilli() - lastMovementState.lastEtaNotificationAt().toEpochMilli();
 
+        long durationOnState = now.toEpochMilli() - (lastMovementState != null ? lastMovementState.stateStartedAt().toEpochMilli() : now.toEpochMilli());
+
+        boolean cooldownExpired = lastEtaNotifyAt == null || hasEnoughCooldownForStopped(lastEtaNotifyAt, now, NOTIFICATION_COOLDOWN_MS);
         boolean stayedLongEnough = durationOnState >= STATE_TIME_LIMIT_MS;
-        boolean cooldownExpired = timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS;
+
+        Instant stateStartedAt = (lastMovementState != null) ? lastMovementState.stateStartedAt() : null;
 
         if (stayedLongEnough && cooldownExpired) {
             if (actualMovementState.equals(MovementState.SLOW)) {
                 logger.info("[Trace: {}] Decisão: SHOULD_NOTIFY_SLOW", traceId);
+                redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, stateStartedAt, now, now));
                 return ShouldNotify.SHOULD_NOTIFY_SLOW;
             }
-            if (actualMovementState.equals(MovementState.STOPPED) && timeSinceLastNotification >= NOTIFICATION_COOLDOWN_MS_STOPPED) {
+            if (actualMovementState.equals(MovementState.STOPPED) && hasEnoughCooldownForStopped(lastEtaNotifyAt, now, NOTIFICATION_COOLDOWN_MS_STOPPED)) {
                 logger.info("[Trace: {}] Decisão: NOTIFY_STOPPED", traceId);
+                redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, stateStartedAt, now, now));
                 return ShouldNotify.SHOULD_NOTIFY_STOPPED;
             }
         }
@@ -337,5 +349,10 @@ public class PushNotificationService {
                 .toList();
         logger.info("Viagem {}: Cálculo concluído. {} alunos processados com sucesso.", travelId, results.size());
         return results;
+    }
+
+    private boolean hasEnoughCooldownForStopped(Instant lastEtaNotify, Instant now, long notificationCooldown) {
+        if (lastEtaNotify == null) return true;
+        return Duration.between(lastEtaNotify, now).toMillis() >= notificationCooldown;
     }
 }

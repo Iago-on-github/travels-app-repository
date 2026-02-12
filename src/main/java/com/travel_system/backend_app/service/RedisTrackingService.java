@@ -300,6 +300,33 @@ public class RedisTrackingService {
 
     }
 
+    // armazena apenas o estado de movimento
+    public void saveAnalyzedMovementState(UUID travelId, AnalyzeMovementStateDTO analyzeMovementStateDTO) {
+        // primeiro ping
+        if (analyzeMovementStateDTO == null) return;
+
+        String key = HASH_KEY_PREFIX + travelId;
+
+        String movementState = String.valueOf(analyzeMovementStateDTO.movementState());
+        String stateStartedAt = String.valueOf(analyzeMovementStateDTO.stateStartedAt());
+
+        Map<String, String> data = new HashMap<>();
+
+        String cacheMovementState = hashOperations.get(key, "movementState");
+        String lastNotificationSendAt = hashOperations.get(key, "lastNotificationSendAt");
+        String lastEtaNotificationAt = hashOperations.get(key, "lastEtaNotificationAt");
+
+        if (cacheMovementState == null) {
+            velocityAnalysisHelper(key, movementState, data, stateStartedAt, lastNotificationSendAt, lastEtaNotificationAt);
+        }
+        else if (!movementState.equals(cacheMovementState)) {
+            velocityAnalysisHelper(key, movementState, data, stateStartedAt, lastNotificationSendAt, lastEtaNotificationAt);
+        } else {
+            data.put("movementState", movementState);
+            hashOperations.putAll(key, data);
+        }
+    }
+
     // marca que uma notificação foi enviada
     public void markNotificationAsSent(String travelId) {
         Travel travel = travelRepository.findById(UUID.fromString(travelId))
