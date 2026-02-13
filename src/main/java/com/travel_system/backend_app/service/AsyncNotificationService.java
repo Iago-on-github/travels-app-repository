@@ -4,6 +4,7 @@ import com.google.firebase.FirebaseException;
 import com.google.firebase.messaging.FirebaseMessagingException;
 import com.travel_system.backend_app.exceptions.EtaDataStatesInvalidException;
 import com.travel_system.backend_app.model.StudentTravel;
+import com.travel_system.backend_app.model.dtos.MovementNotificationEventDTO;
 import com.travel_system.backend_app.model.dtos.VehicleMovementNotificationDTO;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
@@ -74,7 +75,7 @@ public class AsyncNotificationService {
         studentsAtTrip.forEach(studentId -> {
             try {
                 // enviar notificação para cada estudante
-                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message, traceId);
+                firebaseNotificationSender.pushNotificationToFirebase(new MovementNotificationEventDTO(studentId, travelId, movementState, priority, message, traceId));
             } catch (Exception e) {
                 logger.error("Falha no envio de notificação para o aluno: {} {}", studentId, e.getMessage());
             }
@@ -103,7 +104,7 @@ public class AsyncNotificationService {
         studentsAtTrip.forEach(studentId -> {
             try {
                 // enviar notificação para cada estudante
-                firebaseNotificationSender.pushNotificationToFirebase(studentId, travelId, movementState, priority, message, traceId);
+                firebaseNotificationSender.pushNotificationToFirebase(new MovementNotificationEventDTO(studentId, travelId, movementState, priority, message, traceId));
             } catch (Exception e) {
                 logger.error("Falha no envio de notificação para o aluno: {} {}", studentId, e.getMessage());
             }

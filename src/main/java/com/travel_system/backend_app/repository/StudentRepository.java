@@ -20,4 +20,6 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     Optional<Student> findByEmailOrTelephone(String email, String telephone);
 
     List<Student> findAllByStatus(GeneralStatus status);
+
+
 }

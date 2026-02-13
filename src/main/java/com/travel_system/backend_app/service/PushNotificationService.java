@@ -139,13 +139,17 @@ public class PushNotificationService {
     }
 
     public void processVehicleMovement(VehicleLocationRequestDTO vehicleLocationRequest) {
+        UUID traceId = UUID.randomUUID();
+
         UUID travelId = vehicleLocationRequest.travelId();
         Double latitude = vehicleLocationRequest.latitude();
         Double longitude = vehicleLocationRequest.longitude();
 
-        UUID traceId = UUID.randomUUID();
         logger.info("[Trace: {}] Iniciando processamento para viagem: {}", traceId, travelId);
-        VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(new VehicleLocationRequestDTO(travelId, latitude, longitude));
+        VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(new VehicleLocationRequestDTO(
+                travelId,
+                latitude,
+                longitude));
 
         ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis, traceId);
 
@@ -155,46 +159,56 @@ public class PushNotificationService {
                 velocityAnalysis,
                 decision,
                 traceId));
-
-        redisTrackingService.storeLastKnownState(travelId, velocityAnalysis);
     }
 
     // usa analyzeVehicleMovement e decide se deve notificar
     private ShouldNotify shouldSendNotification(UUID travelId, VelocityAnalysisDTO velocityAnalysis, UUID traceId) {
         // verificar mudanças de estado
+
         AnalyzeMovementStateDTO lastMovementState = redisTrackingService.getLastMovementState(String.valueOf(travelId));
         MovementState actualMovementState = velocityAnalysis.movementState();
+
+        Instant lastEtaNotifyAt = (lastMovementState != null) ? lastMovementState.lastEtaNotificationAt() : null;
+        Instant lastGeneralNotifySendAt = (lastMovementState != null) ? lastMovementState.lastNotificationSendAt() : null;
+
+        Instant now = Instant.now();
 
         // primeiro ciclo: sem estado anterior - seta posição atual como a antiga position registrada
         MovementState movementState;
         if (lastMovementState == null || lastMovementState.movementState() == null) {
-            movementState = actualMovementState;
+            logger.info("[Trace: {}] Primeiro ciclo: Inicializando estado no Redis", traceId);
+            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, now, null, null));
+            return ShouldNotify.SHOULD_NO_NOTIFY;
         } else {
             movementState = lastMovementState.movementState();
         }
-
-        Instant now = Instant.now();
+        logger.info("DEBUG: Estado no Redis: {} | Estado Atual: {}", movementState, actualMovementState);
 
         final long STATE_TIME_LIMIT_MS = 4_000;
         final long NOTIFICATION_COOLDOWN_MS = 12_000;
         final long NOTIFICATION_COOLDOWN_MS_STOPPED = 300_000;
 
-        Instant lastEtaNotifyAt = (lastMovementState != null) ? lastMovementState.lastEtaNotificationAt() : null;
-
         // comparar estados
         // se o estado mudou, ainda nao notifica mas salva a mudança no Redis
         if (!actualMovementState.equals(movementState)) {
             logger.info("Estado mudou, ainda não notifica e salva o estado no Redis");
-            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, now , lastEtaNotifyAt, lastEtaNotifyAt));
+            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(
+                    actualMovementState,
+                    now,
+                    lastGeneralNotifySendAt,
+                    lastEtaNotifyAt));
             return ShouldNotify.SHOULD_NO_NOTIFY;
         }
 
         if (actualMovementState.equals(MovementState.NORMAL)) {
             logger.info("Estado não mudou, não notifica");
-            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(actualMovementState, now , lastEtaNotifyAt, lastEtaNotifyAt));
+            redisTrackingService.saveAnalyzedMovementState(travelId, new AnalyzeMovementStateDTO(
+                    actualMovementState,
+                    now,
+                    lastGeneralNotifySendAt,
+                    lastEtaNotifyAt));
             return ShouldNotify.SHOULD_NO_NOTIFY;
         }
-
 
         long durationOnState = now.toEpochMilli() - (lastMovementState != null ? lastMovementState.stateStartedAt().toEpochMilli() : now.toEpochMilli());
 
@@ -232,9 +246,6 @@ public class PushNotificationService {
         LastLocationDTO lastLocation = redisTrackingService.getLastLocation(travelId);
         LiveLocationDTO actuallyPosition = getLiveLocationDTO(latitude, longitude, lastRecentPosition);
 
-        // atualiza última posição no redis mesmo se algo falhar
-        redisTrackingService.keepMemoryBetweenDriverPings(travelId, actuallyPosition);
-
         VelocityAnalysisDTO result;
 
         // Primeiro ping
@@ -247,21 +258,18 @@ public class PushNotificationService {
                 .toSeconds();
 
         final int MIN_SECONDS = 5;
-
         if (elapsedSeconds < MIN_SECONDS) {
             return new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
         }
 
+        // atualiza última posição no redis mesmo se algo falhar
+        redisTrackingService.keepMemoryBetweenDriverPings(travelId, actuallyPosition);
+
         Double distanceBetweenPings =
                 routeCalculationService.calculateHaversineDistanceInMeters(
                         longitude, latitude,
-                        lastLocation.longitude(), lastLocation.latitude());
-
-        final int MIN_SOLID_SPEED_DISTANCE = 5;
-
-        if (distanceBetweenPings < MIN_SOLID_SPEED_DISTANCE) {
-            return new VelocityAnalysisDTO(null, null, null, null, MovementState.INSUFFICIENT_DATA);
-        }
+                        lastLocation.longitude(),
+                        lastLocation.latitude());
 
         PreviousStateDTO previousEta =
                 redisTrackingService.getPreviousEta(String.valueOf(travelId));
@@ -271,6 +279,7 @@ public class PushNotificationService {
         MovementState state;
         double avgSpeed = distanceBetweenPings / elapsedSeconds;
         final double MIN_SPEED_THRESHOLD = 0.5;
+        final int MIN_SOLID_SPEED_DISTANCE = 1;
 
         if (previousEta != null) {
             distanceRemaining = previousEta.distanceRemaining();
@@ -279,7 +288,8 @@ public class PushNotificationService {
         logger.info("[ANALYSIS DEBUG] Travel: {} | Elapsed: {}s | Distance: {}m | Speed: {}m/s | Threshold: {}m/s | Lat/Lng: {} , {}",
                 travelId, elapsedSeconds, String.format("%.2f", distanceBetweenPings), String.format("%.2f", avgSpeed), MIN_SPEED_THRESHOLD, latitude, longitude);
 
-        if (avgSpeed == 0) {
+        // moveu menos q 1m = está parado
+        if (distanceBetweenPings < MIN_SOLID_SPEED_DISTANCE) {
             state = MovementState.STOPPED;
         } else if (avgSpeed <= MIN_SPEED_THRESHOLD) {
             state = MovementState.SLOW;

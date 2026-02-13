@@ -270,36 +270,6 @@ public class RedisTrackingService {
         hashOperations.putAll(key, data);
     }
 
-    // persiste e mantém coerente o estado de movimento do veículo ao logo do tempo
-    public void storeLastKnownState(UUID travelId, VelocityAnalysisDTO velocityAnalysis) {
-        // trata como first ping se não existir registo no redis
-        if (velocityAnalysis == null || velocityAnalysis.movementState() == null) {
-            return;
-        }
-
-        String key = HASH_KEY_PREFIX + travelId;
-
-        String movementState = String.valueOf(velocityAnalysis.movementState());
-        String stateStartedAt = String.valueOf(Instant.now());
-
-        Map<String, String> data = new HashMap<>();
-
-        String cacheMovementState = hashOperations.get(key, "movementState");
-        String lastNotificationSendAt = hashOperations.get(key, "lastNotificationSendAt");
-        String lastEtaNotificationAt = hashOperations.get(key, "lastEtaNotificationAt");
-
-        if (cacheMovementState == null) {
-            velocityAnalysisHelper(key, movementState, data, stateStartedAt, lastNotificationSendAt, lastEtaNotificationAt);
-        }
-        else if (!movementState.equals(cacheMovementState)) {
-            velocityAnalysisHelper(key, movementState, data, stateStartedAt, lastNotificationSendAt, lastEtaNotificationAt);
-        } else {
-            data.put("movementState", movementState);
-            hashOperations.putAll(key, data);
-        }
-
-    }
-
     // armazena apenas o estado de movimento
     public void saveAnalyzedMovementState(UUID travelId, AnalyzeMovementStateDTO analyzeMovementStateDTO) {
         // primeiro ping

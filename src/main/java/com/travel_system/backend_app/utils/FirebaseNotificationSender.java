@@ -4,6 +4,7 @@ import com.google.firebase.messaging.*;
 import com.travel_system.backend_app.exceptions.DomainValidationException;
 import com.travel_system.backend_app.model.DeviceToken;
 import com.travel_system.backend_app.model.Student;
+import com.travel_system.backend_app.model.dtos.MovementNotificationEventDTO;
 import com.travel_system.backend_app.model.dtos.VehicleMovementNotificationDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.model.enums.Platform;
@@ -18,6 +19,8 @@ import org.springframework.stereotype.Service;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static io.lettuce.core.pubsub.PubSubOutput.Type.message;
 
 @Service
 public class FirebaseNotificationSender {
@@ -55,7 +58,14 @@ public class FirebaseNotificationSender {
     }
 
     // enviar notificação ao firebase
-    public VehicleMovementNotificationDTO pushNotificationToFirebase(UUID studentId, UUID travelId, MovementState movementState, Priority priority, String message, UUID traceId) {
+    public VehicleMovementNotificationDTO pushNotificationToFirebase(MovementNotificationEventDTO movementNotificationEvent) {
+        UUID studentId = movementNotificationEvent.studentId();
+        UUID travelId = movementNotificationEvent.travelId();
+        UUID traceId = movementNotificationEvent.traceId();
+        MovementState movementState = movementNotificationEvent.movementState();
+        Priority priority = movementNotificationEvent.priority();
+        String message = movementNotificationEvent.message();
+
         Set<DeviceToken> studentActiveTokens = studentActiveTokens(studentId);
 
         if (studentActiveTokens.isEmpty()) return null;
