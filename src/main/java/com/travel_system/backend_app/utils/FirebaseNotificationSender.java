@@ -141,7 +141,7 @@ public class FirebaseNotificationSender {
 
     // pega todos os tokens ativos do usuário
     private Set<DeviceToken> studentActiveTokens(UUID studentId) {
-        Student student = studentRepository.findById(studentId)
+        Student student = studentRepository.findByStudentWithActiveDeviceTokens(studentId)
                 .orElseThrow(() -> new EntityNotFoundException("estudante não encontrado" + studentId));
 
         return student.getDeviceTokens()
