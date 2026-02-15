@@ -5,6 +5,7 @@ import com.travel_system.backend_app.exceptions.DomainValidationException;
 import com.travel_system.backend_app.model.DeviceToken;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.dtos.MovementNotificationEventDTO;
+import com.travel_system.backend_app.model.dtos.StudentTokensDTO;
 import com.travel_system.backend_app.model.dtos.VehicleMovementNotificationDTO;
 import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.model.enums.Platform;
@@ -12,6 +13,7 @@ import com.travel_system.backend_app.model.enums.Priority;
 import com.travel_system.backend_app.repository.DeviceTokenRepository;
 import com.travel_system.backend_app.repository.StudentRepository;
 import jakarta.persistence.EntityNotFoundException;
+import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -21,6 +23,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 import static io.lettuce.core.pubsub.PubSubOutput.Type.message;
+import static java.util.stream.Collectors.toList;
 
 @Service
 public class FirebaseNotificationSender {
@@ -66,11 +69,14 @@ public class FirebaseNotificationSender {
         Priority priority = movementNotificationEvent.priority();
         String message = movementNotificationEvent.message();
 
-        Set<DeviceToken> studentActiveTokens = studentActiveTokens(studentId);
+        Set<String> studentActiveTokens = studentActiveTokens(studentId);
 
-        if (studentActiveTokens.isEmpty()) return null;
+        if (studentActiveTokens.isEmpty()) {
+            logger.info("Nenhum token ativo para o aluno {}, pulando notificação.", studentId);
+            return null;
+        }
 
-        List<DeviceToken> deviceTokens = studentActiveTokens.stream().toList();
+        List<String> deviceTokens = studentActiveTokens.stream().toList();
 
         MulticastMessage payload = convertMovementNotifyToFcmFormat(travelId, movementState, priority, message, deviceTokens);
 
@@ -79,10 +85,11 @@ public class FirebaseNotificationSender {
 
             logger.info("[Trace: {}] Tokens enviados ao firebase: {}", traceId, response.getSuccessCount());
             if (response.getFailureCount() > 0) {
-                List<DeviceToken> failureTokens = getFailureDeviceTokens(response, deviceTokens);
+                List<String> failureTokens = getFailureDeviceTokens(response, deviceTokens);
                 logger.error("Falha crítica no FCM para o aluno: {} {}", studentId, response.getFailureCount());
                 if (!failureTokens.isEmpty()) {
-                    deviceTokenRepository.saveAll(failureTokens);
+                    logger.warn("Desativando {} tokens inválidos no banco.", failureTokens.size());
+                    deviceTokenRepository.deactivateTokensByValue(failureTokens);
                 }
             }
         } catch (FirebaseMessagingException e) {
@@ -93,14 +100,14 @@ public class FirebaseNotificationSender {
     }
 
     // retorna os tokens que falharam da response
-    private static List<DeviceToken> getFailureDeviceTokens(BatchResponse response, List<DeviceToken> deviceTokens) {
+    private static List<String> getFailureDeviceTokens(BatchResponse response, List<String> deviceTokens) {
         List<SendResponse> responses = response.getResponses();
+        List<String> failureTokens = new ArrayList<>();
 
-        List<DeviceToken> failureTokens = new ArrayList<>();
         for (int i = 0; i < responses.size(); i++) {
             if (!responses.get(i).isSuccessful()) {
 
-                DeviceToken failedToken = deviceTokens.get(i);
+                String failedToken = deviceTokens.get(i);
 
                 MessagingErrorCode messagingErrorCode = responses.get(i).getException()
                         .getMessagingErrorCode();
@@ -108,7 +115,6 @@ public class FirebaseNotificationSender {
                 // usuário removeu o app ou limpou os dados ou formato incorreto do token
                 if (messagingErrorCode.equals(MessagingErrorCode.UNREGISTERED) || messagingErrorCode.equals(MessagingErrorCode.INVALID_ARGUMENT)) {
                     logger.info("Processo de desativação do token... motivo: {}", messagingErrorCode);
-                    failedToken.setActive(false);
 
                     // lista temporária para desativar os tokens
                     failureTokens.add(failedToken);
@@ -123,7 +129,7 @@ public class FirebaseNotificationSender {
     }
 
     // converte dto para formato fcm
-    private MulticastMessage convertMovementNotifyToFcmFormat(UUID travelId, MovementState movementState, Priority priority, String message, List<DeviceToken> studentActiveTokens) {
+    private MulticastMessage convertMovementNotifyToFcmFormat(UUID travelId, MovementState movementState, Priority priority, String message, List<String> studentActiveTokens) {
         Map<String, String> data = new HashMap<>();
 
         data.put("travelId", String.valueOf(travelId));
@@ -131,7 +137,7 @@ public class FirebaseNotificationSender {
         data.put("priority", String.valueOf(priority));
         data.put("message", message);
 
-        Set<String> convertedTokens = studentActiveTokens.stream().map(DeviceToken::getToken).collect(Collectors.toSet());
+        Set<String> convertedTokens = new HashSet<>(studentActiveTokens);
 
         return MulticastMessage.builder()
                 .putAllData(data)
@@ -140,11 +146,7 @@ public class FirebaseNotificationSender {
     }
 
     // pega todos os tokens ativos do usuário
-    private Set<DeviceToken> studentActiveTokens(UUID studentId) {
-        Student student = studentRepository.findByStudentWithActiveDeviceTokens(studentId)
-                .orElseThrow(() -> new EntityNotFoundException("estudante não encontrado" + studentId));
-
-        return student.getDeviceTokens()
-                .stream().filter(DeviceToken::isActive).collect(Collectors.toSet());
+    private Set<String> studentActiveTokens(UUID studentId) {
+        return studentRepository.findActiveTokensByStudentId(studentId);
     }
 }
