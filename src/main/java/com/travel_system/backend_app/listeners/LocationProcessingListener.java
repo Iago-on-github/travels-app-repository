@@ -12,7 +12,6 @@ import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
-import java.util.Optional;
 import java.util.UUID;
 
 @Component
@@ -29,14 +28,10 @@ public class LocationProcessingListener {
 
     @Async
     @EventListener
-    @Transactional(readOnly = true)
     public void handleLocationProcessing(NewLocationReceivedEvents locationReceivedEvents) {
         UUID travelId = locationReceivedEvents.travelId();
         Double latitude = locationReceivedEvents.latitude();
         Double longitude = locationReceivedEvents.longitude();
-
-        Travel travel = travelRepository.findByIdWithStudents(travelId)
-                .orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
 
         travelTrackingService.processNewLocation(new VehicleLocationRequestDTO(travelId, latitude, longitude));
 
