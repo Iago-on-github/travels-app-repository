@@ -15,6 +15,6 @@ public class RabbitMQProducer {
     }
 
     public void sendMessage(SendPackageDataToRabbitMQ event) {
-        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NAME, RabbitMQConfig.ROUTING_KEY, event);
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NOTIFICATION_NAME, RabbitMQConfig.NOTIFICATION_ROUTE_KEY, event);
     }
 }
