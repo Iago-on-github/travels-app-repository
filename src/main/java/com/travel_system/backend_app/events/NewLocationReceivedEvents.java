@@ -10,5 +10,7 @@ public record NewLocationReceivedEvents(
         Double latitude,
         Double longitude,
         Instant timestamp,
-        TravelStatus status) {
+        TravelStatus status,
+        Double speed,
+        Double heading) {
 }
