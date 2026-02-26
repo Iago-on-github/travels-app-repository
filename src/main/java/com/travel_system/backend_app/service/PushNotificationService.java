@@ -1,12 +1,8 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.events.StudentProximityEvents;
 import com.travel_system.backend_app.events.VehicleMovementEvents;
-import com.travel_system.backend_app.exceptions.TripNotFound;
-import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
-import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.PreviousStateDTO;
@@ -18,7 +14,6 @@ import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDT
 import com.travel_system.backend_app.model.enums.MovementState;
 import com.travel_system.backend_app.model.enums.ShouldNotify;
 import com.travel_system.backend_app.repository.TravelRepository;
-import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -144,12 +139,16 @@ public class PushNotificationService {
         UUID travelId = vehicleLocationRequest.travelId();
         Double latitude = vehicleLocationRequest.latitude();
         Double longitude = vehicleLocationRequest.longitude();
+        Double speed = vehicleLocationRequest.speed();
+        Double heading = vehicleLocationRequest.heading();
 
         logger.info("[Trace: {}] Iniciando processamento para viagem: {}", traceId, travelId);
         VelocityAnalysisDTO velocityAnalysis = analyzeVehicleMovement(new VehicleLocationRequestDTO(
                 travelId,
                 latitude,
-                longitude));
+                longitude,
+                speed,
+                heading));
 
         ShouldNotify decision = shouldSendNotification(travelId, velocityAnalysis, traceId);
 
