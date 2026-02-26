@@ -15,6 +15,9 @@ public class Travel {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
+    @ManyToOne
+    @JoinColumn(name = "city_id")
+    private City city;
     @Enumerated(value = EnumType.STRING)
     private TravelStatus travelStatus;
     @ManyToOne
@@ -42,11 +45,11 @@ public class Travel {
     public Travel() {
     }
 
-    public Travel(UUID id, TravelStatus travelStatus, Driver driver, Set<StudentTravel> studentTravels, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Double duration, Double distance, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude) {
+    public Travel(UUID id, City city, TravelStatus travelStatus, Driver driver, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Double duration, Double distance, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude) {
         this.id = id;
+        this.city = city;
         this.travelStatus = travelStatus;
         this.driver = driver;
-        this.studentTravels = studentTravels;
         this.startHourTravel = startHourTravel;
         this.endHourTravel = endHourTravel;
         this.polylineRoute = polylineRoute;
@@ -160,5 +163,13 @@ public class Travel {
 
     public void setFinalLongitude(Double finalLongitude) {
         this.finalLongitude = finalLongitude;
+    }
+
+    public City getCity() {
+        return city;
+    }
+
+    public void setCity(City city) {
+        this.city = city;
     }
 }
