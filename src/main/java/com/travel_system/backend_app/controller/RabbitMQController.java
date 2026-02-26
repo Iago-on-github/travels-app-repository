@@ -1,6 +1,6 @@
 package com.travel_system.backend_app.controller;
 
-import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
+import com.travel_system.backend_app.model.dtos.mesageria.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.utils.RabbitMQProducer;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

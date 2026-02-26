@@ -1,7 +1,7 @@
 package com.travel_system.backend_app.utils;
 
 import com.travel_system.backend_app.config.RabbitMQConfig;
-import com.travel_system.backend_app.model.dtos.SendPackageDataToRabbitMQ;
+import com.travel_system.backend_app.model.dtos.mesageria.SendPackageDataToRabbitMQ;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Component;
 
