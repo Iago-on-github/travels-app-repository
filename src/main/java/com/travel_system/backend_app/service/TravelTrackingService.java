@@ -49,6 +49,8 @@ public class TravelTrackingService {
         UUID travelId = vehicleLocationRequest.travelId();
         Double latitude = vehicleLocationRequest.latitude();
         Double longitude = vehicleLocationRequest.longitude();
+        Double speed = vehicleLocationRequest.speed();
+        Double heading = vehicleLocationRequest.heading();
 
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new TripNotFound("Trip not found"));
@@ -74,7 +76,8 @@ public class TravelTrackingService {
                 latitude,
                 longitude,
                 Instant.now(),
-                travel.getTravelStatus());
+                travel.getTravelStatus(),
+                speed, heading);
 
         eventPublisher.publishEvent(event);
     }
