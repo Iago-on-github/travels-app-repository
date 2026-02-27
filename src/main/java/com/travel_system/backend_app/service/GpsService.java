@@ -1,23 +1,33 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.config.RabbitMQConfig;
+import com.travel_system.backend_app.interfaces.RealTimeMessagingContract;
 import com.travel_system.backend_app.model.dtos.mesageria.MessagingDTO;
+import com.travel_system.backend_app.model.dtos.mesageria.SendPackageDataToRabbitMQ;
+import org.springframework.amqp.core.MessageDeliveryMode;
+import org.springframework.amqp.core.MessagePostProcessor;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
 
 @Service
-public class GpsService {
+public class GpsService implements RealTimeMessagingContract {
     private final RabbitTemplate rabbitTemplate;
 
     public GpsService(RabbitTemplate rabbitTemplate) {
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    @Override
     public void sendLocalization(String city, UUID travelId, MessagingDTO messagingDTO) {
         final String ROUTING_GPS_KEY = "gps." + city + "." + travelId;
 
-        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_GPS_NAME, ROUTING_GPS_KEY, messagingDTO);
+        // QoS 0: Mensagem não persistente
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_GPS_NAME, ROUTING_GPS_KEY, messagingDTO, message -> {
+            message.getMessageProperties().setDeliveryMode(MessageDeliveryMode.NON_PERSISTENT);
+            return message;
+        });
     }
+
 }
