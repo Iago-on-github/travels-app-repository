@@ -18,26 +18,36 @@ import java.util.UUID;
 public class LocationProcessingListener {
     private final TravelTrackingService travelTrackingService;
     private final PushNotificationService pushNotificationService;
-    private final TravelRepository travelRepository;
 
-    public LocationProcessingListener(TravelTrackingService travelTrackingService, PushNotificationService pushNotificationService, TravelRepository travelRepository) {
+    public LocationProcessingListener(TravelTrackingService travelTrackingService, PushNotificationService pushNotificationService) {
         this.travelTrackingService = travelTrackingService;
         this.pushNotificationService = pushNotificationService;
-        this.travelRepository = travelRepository;
     }
 
     @Async
     @EventListener
     public void handleLocationProcessing(NewLocationReceivedEvents locationReceivedEvents) {
-        UUID travelId = locationReceivedEvents.travelId();
-        Double latitude = locationReceivedEvents.latitude();
-        Double longitude = locationReceivedEvents.longitude();
-
-        travelTrackingService.processNewLocation(new VehicleLocationRequestDTO(travelId, latitude, longitude));
+        VehicleLocationRequestDTO vehicleLocationRequest = getVehicleLocationRequestDTO(locationReceivedEvents);
+        travelTrackingService.processNewLocation(vehicleLocationRequest);
 
         // 2. Processa Alertas de Proximidade e Movimento (O "cérebro" das notificações)
         // Note: o checkProximityAlerts agora será disparado a cada novo ping de GPS
-        pushNotificationService.checkProximityAlerts(new VehicleLocationRequestDTO(travelId, latitude, longitude));
-        pushNotificationService.processVehicleMovement(new VehicleLocationRequestDTO(travelId, latitude, longitude));
+        pushNotificationService.checkProximityAlerts(vehicleLocationRequest);
+        pushNotificationService.processVehicleMovement(vehicleLocationRequest);
+    }
+
+    private static VehicleLocationRequestDTO getVehicleLocationRequestDTO(NewLocationReceivedEvents locationReceivedEvents) {
+        UUID travelId = locationReceivedEvents.travelId();
+        Double latitude = locationReceivedEvents.latitude();
+        Double longitude = locationReceivedEvents.longitude();
+        Double heading = locationReceivedEvents.heading();
+        Double speed = locationReceivedEvents.speed();
+
+        return new VehicleLocationRequestDTO(
+                travelId,
+                latitude,
+                longitude,
+                speed,
+                heading);
     }
 }

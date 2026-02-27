@@ -3,6 +3,7 @@ package com.travel_system.backend_app.listeners;
 import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.mesageria.MessagingDTO;
+import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
 import com.travel_system.backend_app.repository.CityRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.service.GpsService;
@@ -31,7 +32,7 @@ public class GpsMessagingListener {
 
     @EventListener
     @Async
-    public void handleGpsRabbitmqMessaging(NewLocationReceivedEvents locationReceivedEvents) {
+    public void handleGpsToMessaging(NewLocationReceivedEvents locationReceivedEvents) {
         UUID travelId = locationReceivedEvents.travelId();
         Double latitude = locationReceivedEvents.latitude();
         Double longitude = locationReceivedEvents.longitude();
@@ -42,7 +43,7 @@ public class GpsMessagingListener {
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada" + travelId));
 
-        logger.info("entidade Travel encontrada, seguindo adiante com o processamento do gps no rabbitmq");
+        logger.info("[handleGpsToMessaging] entidade Travel encontrada, seguindo adiante com o processamento do gps no rabbitmq");
 
         String cityName = travel.getCity().getName().toLowerCase();
         String cityNameFormatted = cityName.replace(" ", "_").trim();
@@ -51,4 +52,5 @@ public class GpsMessagingListener {
 
         gpsService.sendLocalization(cityNameFormatted, travelId, messagingDTO);
     }
+
 }

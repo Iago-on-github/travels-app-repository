@@ -2,6 +2,7 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.events.StudentProximityEvents;
 import com.travel_system.backend_app.events.VehicleMovementEvents;
+import com.travel_system.backend_app.listeners.GpsMessagingListener;
 import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.LiveLocationDTO;
@@ -35,18 +36,20 @@ public class PushNotificationService {
     private final RedisNotificationService redisNotificationService;
     private final RedisTrackingService redisTrackingService;
     private final TravelRepository travelRepository;
+    private final GpsMessagingListener gpsMessagingListener;
 
     private final ApplicationEventPublisher eventPublisher;
 
     private static final Logger logger = LoggerFactory.getLogger(PushNotificationService.class);
 
-    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RedisTrackingService redisTrackingService, TravelRepository travelRepository, ApplicationEventPublisher eventPublisher) {
+    public PushNotificationService(TravelTrackingService travelTrackingService, TravelService travelService, RouteCalculationService routeCalculationService, RedisNotificationService redisNotificationService, RedisTrackingService redisTrackingService, TravelRepository travelRepository, GpsMessagingListener gpsMessagingListener, ApplicationEventPublisher eventPublisher) {
         this.travelTrackingService = travelTrackingService;
         this.travelService = travelService;
         this.routeCalculationService = routeCalculationService;
         this.redisNotificationService = redisNotificationService;
         this.redisTrackingService = redisTrackingService;
         this.travelRepository = travelRepository;
+        this.gpsMessagingListener = gpsMessagingListener;
         this.eventPublisher = eventPublisher;
     }
 
@@ -58,6 +61,8 @@ public class PushNotificationService {
         UUID travelId = vehicleLocationRequest.travelId();
         Double latitude = vehicleLocationRequest.latitude();
         Double longitude = vehicleLocationRequest.longitude();
+        Double speed = vehicleLocationRequest.speed();
+        Double heading = vehicleLocationRequest.heading();
 
         LiveLocationDTO driverPosition = new LiveLocationDTO(latitude, longitude, null, 0.0, null, null);
         Set<StudentTravelResponseDTO> linkedStudentTravel = travelService.linkedStudentTravel(travelId);

@@ -15,7 +15,6 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_GPS_NAME = "tg_gps_exchange";
 
     public static final String NOTIFICATION_ROUTE_KEY = "notification_distance";
-    // definir: gps.<id_cidade>.<id_linha>.<id_veiculo>
 
     @Bean
     public Queue queue() {
