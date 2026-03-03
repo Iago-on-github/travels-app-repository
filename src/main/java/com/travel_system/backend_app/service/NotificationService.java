@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageDeliveryMode;
-import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
@@ -24,6 +23,7 @@ public class NotificationService implements NotificationMessagingContract {
 
     @Override
     public void sendMessage(SendPackageDataToRabbitMQ dataEvent) {
+        logger.info("Received message: {}", dataEvent);
         // QoS 1: Mensagem persistente
         rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NOTIFICATION_NAME, RabbitMQConfig.NOTIFICATION_ROUTE_KEY, dataEvent, event -> {
             event.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
@@ -37,12 +37,14 @@ public class NotificationService implements NotificationMessagingContract {
         final int MAX_RETRIES_COUNT = 3;
         final String HEADER_X_RETRIES_COUNT = "x-retries-count";
 
+        logger.info("Received failed message: {}", failedMessage.toString());
+
         Integer retiresCount = (Integer) failedMessage.getMessageProperties().getHeaders().get(HEADER_X_RETRIES_COUNT);
         if (retiresCount == null) retiresCount = 1;
         if (retiresCount >= MAX_RETRIES_COUNT) {
             logger.info("Send message to the parking lot queue");
             rabbitTemplate.send(RabbitMQConfig.EXCHANGE_PARKING_LOT,
-                    failedMessage.getMessageProperties().getReceivedRoutingKey(),
+                    RabbitMQConfig.ROUTING_KEY_PARKING_LOT,
                     failedMessage);
             return;
         }
