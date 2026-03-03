@@ -1,8 +1,10 @@
 package com.travel_system.backend_app.listeners;
 
+import com.travel_system.backend_app.config.RabbitMQConfig;
 import com.travel_system.backend_app.events.StudentProximityEvents;
 import com.travel_system.backend_app.model.dtos.mesageria.SendPackageDataToRabbitMQ;
 import com.travel_system.backend_app.service.NotificationService;
+import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
