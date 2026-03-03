@@ -17,17 +17,17 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_ERR_DLX = "notification.dlx";
 
     public static final String NOTIFICATION_ROUTE_KEY = "notification.distance";
-    public static final String DEAD_LETTER_ROUTING_KEY = "x-dead-letter-routing-key";
     public static final String ERR_ROUTING_KEY = "notification.error";
 
     public static final String QUEUE_PARKING_LOT = QUEUE_NOTIFICATION_NAME + ".parking-lot";
     public static final String EXCHANGE_PARKING_LOT = QUEUE_NOTIFICATION_NAME + ".exchange.parking-lot";
+    public static final String ROUTING_KEY_PARKING_LOT = "notification.parking-lot";
 
     @Bean
     public Queue queueNotification() {
         return QueueBuilder.durable()
                 .withArgument("x-dead-letter-exchange", EXCHANGE_ERR_DLX)
-                .withArgument(DEAD_LETTER_ROUTING_KEY, ERR_ROUTING_KEY)
+                .withArgument("x-dead-letter-routing-key", ERR_ROUTING_KEY)
                 .build();
     }
 
@@ -80,7 +80,7 @@ public class RabbitMQConfig {
 
     @Bean
     public Binding bindingParkingLot(Queue queueParkingLot, TopicExchange exchangeParkingLot) {
-        return BindingBuilder.bind(queueParkingLot).to(exchangeParkingLot).with(DEAD_LETTER_ROUTING_KEY);
+        return BindingBuilder.bind(queueParkingLot).to(exchangeParkingLot).with(ROUTING_KEY_PARKING_LOT);
     }
 
     // serialização
