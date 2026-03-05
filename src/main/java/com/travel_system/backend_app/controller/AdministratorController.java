@@ -18,9 +18,8 @@ import java.util.UUID;
 @RequestMapping("/admins")
 public class AdministratorController {
 
-    private AdministratorService administratorService;
+    private final AdministratorService administratorService;
 
-    @Autowired
     public AdministratorController(AdministratorService administratorService) {
         this.administratorService = administratorService;
     }
