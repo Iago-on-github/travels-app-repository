@@ -200,6 +200,11 @@ public class TravelService {
         return linkedStudents.stream().map(this::studentTravelMapper).collect(Collectors.toSet());
     }
 
+    public boolean isStudentPresent(UUID studentId, UUID travelId) {
+        return travelRepository.existsByStudentIdAndTravelId(studentId, travelId);
+    }
+
+
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
