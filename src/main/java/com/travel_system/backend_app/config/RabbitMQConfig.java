@@ -25,7 +25,7 @@ public class RabbitMQConfig {
 
     @Bean
     public Queue queueNotification() {
-        return QueueBuilder.durable()
+        return QueueBuilder.durable("queue.notification")
                 .withArgument("x-dead-letter-exchange", EXCHANGE_ERR_DLX)
                 .withArgument("x-dead-letter-routing-key", ERR_ROUTING_KEY)
                 .build();
@@ -74,13 +74,13 @@ public class RabbitMQConfig {
     }
 
     @Bean
-    public Binding bindingErr(Queue queueErr, TopicExchange exchangeErr) {
-        return BindingBuilder.bind(queueErr).to(exchangeErr).with(ERR_ROUTING_KEY);
+    public Binding bindingErr(Queue queueErr, TopicExchange exchangeError) {
+        return BindingBuilder.bind(queueErr).to(exchangeError).with(ERR_ROUTING_KEY);
     }
 
     @Bean
-    public Binding bindingParkingLot(Queue queueParkingLot, TopicExchange exchangeParkingLot) {
-        return BindingBuilder.bind(queueParkingLot).to(exchangeParkingLot).with(ROUTING_KEY_PARKING_LOT);
+    public Binding bindingParkingLot(Queue queueParkingLot, TopicExchange parkingLotExchange) {
+        return BindingBuilder.bind(queueParkingLot).to(parkingLotExchange).with(ROUTING_KEY_PARKING_LOT);
     }
 
     // serialização
