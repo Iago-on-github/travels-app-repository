@@ -25,7 +25,7 @@ public class NotificationService implements NotificationMessagingContract {
     public void sendMessage(SendPackageDataToRabbitMQ dataEvent) {
         logger.info("Received message: {}", dataEvent);
         // QoS 1: Mensagem persistente
-        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NOTIFICATION_NAME, RabbitMQConfig.NOTIFICATION_ROUTE_KEY, dataEvent, event -> {
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_NOTIFICATION_NAME, RabbitMQConfig.NOTIFICATION_ROUTING_KEY, dataEvent, event -> {
             event.getMessageProperties().setDeliveryMode(MessageDeliveryMode.PERSISTENT);
             return event;
         });

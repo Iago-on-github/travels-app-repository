@@ -16,7 +16,7 @@ public class RabbitMQConfig {
     public static final String EXCHANGE_GPS_NAME = "tg.gps.exchange";
     public static final String EXCHANGE_ERR_DLX = "notification.dlx";
 
-    public static final String NOTIFICATION_ROUTE_KEY = "notification.distance";
+    public static final String NOTIFICATION_ROUTING_KEY = "notification.distance";
     public static final String ERR_ROUTING_KEY = "notification.error";
 
     public static final String QUEUE_PARKING_LOT = QUEUE_NOTIFICATION_NAME + ".parking-lot";
@@ -70,7 +70,7 @@ public class RabbitMQConfig {
 
     @Bean
     public Binding bindingNotification(Queue queueNotification, TopicExchange exchangeNotification) {
-        return BindingBuilder.bind(queueNotification).to(exchangeNotification).with(NOTIFICATION_ROUTE_KEY);
+        return BindingBuilder.bind(queueNotification).to(exchangeNotification).with(NOTIFICATION_ROUTING_KEY);
     }
 
     @Bean
