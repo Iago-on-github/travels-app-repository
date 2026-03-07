@@ -6,6 +6,6 @@ import com.travel_system.backend_app.model.dtos.mesageria.SendPackageDataToRabbi
 import java.util.UUID;
 
 public interface RealTimeMessagingContract {
-    void sendLocalization(String city, UUID travelId, MessagingDTO messagingDTO);
+    void sendLocalizationToNotification(String city, UUID travelId, MessagingDTO messagingDTO);
 
 }

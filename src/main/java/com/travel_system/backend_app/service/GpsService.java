@@ -20,7 +20,7 @@ public class GpsService implements RealTimeMessagingContract {
     }
 
     @Override
-    public void sendLocalization(String city, UUID travelId, MessagingDTO messagingDTO) {
+    public void sendLocalizationToNotification(String city, UUID travelId, MessagingDTO messagingDTO) {
         final String ROUTING_GPS_KEY = "gps." + city + "." + travelId;
 
         // QoS 0: Mensagem não persistente
