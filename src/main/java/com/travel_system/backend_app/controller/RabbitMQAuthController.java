@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.controller;
 
 import com.travel_system.backend_app.config.TokenConfig;
-import com.travel_system.backend_app.repository.UserRepository;
 import com.travel_system.backend_app.service.TravelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
