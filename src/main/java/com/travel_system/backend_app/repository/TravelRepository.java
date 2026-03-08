@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.repository;
 
 import com.travel_system.backend_app.model.Travel;
+import com.travel_system.backend_app.model.enums.TravelStatus;
 import io.lettuce.core.dynamic.annotation.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
@@ -17,4 +18,5 @@ public interface TravelRepository extends JpaRepository<Travel, UUID> {
 
     boolean existsByStudentIdAndTravelId(UUID studentId, UUID travelId);
 
+    boolean existsByTravelIdAndTravelStatus(String travelId, TravelStatus travelStatus);
 }

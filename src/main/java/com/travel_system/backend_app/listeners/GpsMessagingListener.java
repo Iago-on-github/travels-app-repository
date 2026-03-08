@@ -2,12 +2,9 @@ package com.travel_system.backend_app.listeners;
 
 import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.model.Travel;
-import com.travel_system.backend_app.model.dtos.mesageria.MessagingDTO;
-import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
-import com.travel_system.backend_app.repository.CityRepository;
+import com.travel_system.backend_app.model.dtos.mensageria.MessagingDTO;
 import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.service.GpsService;
-import com.travel_system.backend_app.service.PushNotificationService;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

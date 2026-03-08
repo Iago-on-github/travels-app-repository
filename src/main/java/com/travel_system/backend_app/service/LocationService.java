@@ -20,8 +20,6 @@ public class LocationService {
     private final StudentTravelRepository studentTravelRepository;
     private final RouteCalculationService routeCalculationService;
 
-    private final Double DISPLACEMENT_METERS_TOLERANCE = 3.0;
-
     public LocationService(GeoPositionRepository geoPositionRepository, StudentTravelRepository studentTravelRepository, RouteCalculationService routeCalculationService) {
         this.geoPositionRepository = geoPositionRepository;
         this.studentTravelRepository = studentTravelRepository;
@@ -81,6 +79,7 @@ public class LocationService {
                 anteriorPosition.getLatitude(),
                 anteriorPosition.getLongitude());
 
+        Double DISPLACEMENT_METERS_TOLERANCE = 3.0;
         return calculateHaversineDistance > DISPLACEMENT_METERS_TOLERANCE;
     }
 }

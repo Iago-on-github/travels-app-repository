@@ -2,9 +2,12 @@ package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.config.RabbitMQConfig;
 import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
+import com.travel_system.backend_app.model.dtos.route.GpsPayload;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.stereotype.Service;
+
+import java.time.Instant;
 
 @Service
 public class GpsDataIngestorService {
@@ -15,13 +18,25 @@ public class GpsDataIngestorService {
         this.rabbitTemplate = rabbitTemplate;
     }
 
+    // envia ao rabbitmq as informações de gps da viagem + a routing_key contendo ids específicos
     public void sendVehicleGps(String city, String travelId, VehicleLocationRequestDTO vehicleLocation) {
         final String ROUTING_KEY = "v1.gps." + city + "." + travelId;
 
+        GpsPayload gpsPayload = new GpsPayload(
+                vehicleLocation.latitude(),
+                vehicleLocation.longitude(),
+                vehicleLocation.speed(),
+                vehicleLocation.heading(),
+                Instant.now(),
+                vehicleLocation.travelId()
+        );
+
         // QoS 0
-        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_GPS_NAME, ROUTING_KEY, vehicleLocation, location -> {
+        rabbitTemplate.convertAndSend(RabbitMQConfig.EXCHANGE_GPS_NAME, ROUTING_KEY, gpsPayload, location -> {
             location.getMessageProperties().setDeliveryMode(MessageDeliveryMode.NON_PERSISTENT);
             return location;
         });
     }
+
+
 }

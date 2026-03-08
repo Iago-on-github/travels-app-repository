@@ -1,4 +1,4 @@
-package com.travel_system.backend_app.model.dtos.mesageria;
+package com.travel_system.backend_app.model.dtos.mensageria;
 
 import java.time.Instant;
 import java.util.UUID;

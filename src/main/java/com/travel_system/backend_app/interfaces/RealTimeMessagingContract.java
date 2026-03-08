@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.interfaces;
 
-import com.travel_system.backend_app.model.dtos.mesageria.MessagingDTO;
-import com.travel_system.backend_app.model.dtos.mesageria.SendPackageDataToRabbitMQ;
+import com.travel_system.backend_app.model.dtos.mensageria.MessagingDTO;
 
 import java.util.UUID;
 
