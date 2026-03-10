@@ -1,5 +1,6 @@
 package com.travel_system.backend_app.service;
 
+import com.mapbox.geojson.Point;
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.request.TravelRequestDTO;
@@ -19,6 +20,7 @@ import org.springframework.stereotype.Service;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -33,8 +35,10 @@ public class TravelService {
     private final MapboxAPIService mapboxAPIService;
     private final RedisTrackingService redisTrackingService;
     private final TravelReportsRepository travelReportsRepository;
+    private final TravelLocationHistoryRepository travelLocationHistoryRepository;
+    private final PolylineService polylineService;
 
-    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, TravelReportsRepository travelReportsRepository) {
+    public TravelService(TravelRepository travelRepository, StudentTravelRepository studentTravelRepository, StudentRepository studentRepository, DriverRepository driverRepository, MapboxAPIService mapboxAPIService, RedisTrackingService redisTrackingService, TravelReportsRepository travelReportsRepository, TravelLocationHistoryRepository travelLocationHistoryRepository, PolylineService polylineService) {
         this.travelRepository = travelRepository;
         this.studentTravelRepository = studentTravelRepository;
         this.studentRepository = studentRepository;
@@ -42,6 +46,8 @@ public class TravelService {
         this.mapboxAPIService = mapboxAPIService;
         this.redisTrackingService = redisTrackingService;
         this.travelReportsRepository = travelReportsRepository;
+        this.travelLocationHistoryRepository = travelLocationHistoryRepository;
+        this.polylineService = polylineService;
     }
 
     @Transactional
