@@ -17,6 +17,7 @@ import org.springframework.data.redis.core.HashOperations;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -342,6 +343,37 @@ public class RedisTrackingService {
         redisTemplate.delete(key);
 
         redisTemplate.opsForSet().remove(SET_KEY, travelId.toString());
+    }
+
+    // armazena o ultimo history ping da viagem
+    public void saveHistoryPingLocation(UUID travelId, Instant lastPing) {
+        if (travelId == null) return;
+        String key = HASH_KEY_PREFIX + travelId;
+
+        hashOperations.put(key, "last_ping_history", lastPing.toString());
+    }
+
+    // verifica se o último ping da viagem foi salvo há menos de X segundos
+    public boolean isLocationUpdateAllowed(UUID travelId) {
+        if (travelId == null) return false;
+        String key = HASH_KEY_PREFIX + travelId;
+
+        // segundos permitidos
+        final int allowedSeconds = 10;
+        Instant now = Instant.now();
+
+        String getSavedLastPing = hashOperations.get(key, "last_ping_history");
+
+        Instant lastPingSave;
+        // se primeiro ping, retorna true direto
+        if (getSavedLastPing == null) return true;
+
+        lastPingSave = Instant.parse(getSavedLastPing);
+
+        // calcula a diferença e garante que o resultado sempre seja positivo
+        Duration differenceBetweenTimes = Duration.between(lastPingSave, now).abs();
+
+        return differenceBetweenTimes.toSeconds() >= allowedSeconds;
     }
 
     private void velocityAnalysisHelper(String key, String movementState, Map<String, String> data, String stateStartedAt, String lastNotificationSendAt, String lastEtaNotificationAt) {
