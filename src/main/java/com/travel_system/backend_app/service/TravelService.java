@@ -19,11 +19,11 @@ import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 import java.util.stream.Collectors;
+
+import static java.util.stream.Collectors.groupingBy;
+import static java.util.stream.Collectors.mapping;
 
 @Service
 public class TravelService {
@@ -134,6 +134,15 @@ public class TravelService {
             }
         });
 
+        // obtem os dados de lat/lng para formar a polyline da viagem
+        List<TravelLocationHistory> travelRecorded = travelLocationHistoryRepository
+                .findAllByTravelIdOrderByRecordedAtAsc(travelId);
+
+        List<Point> pointList = travelRecorded.stream()
+                .map(t -> t.getLatitude() + ", " + t.getLongitude()).map(Point::fromJson).toList();
+
+        String polylineEncoded = polylineService.formattedPolylineEncoded(pointList);
+
         // COLETA  DE MÉTRICAS SOBRE A VIAGEM
         Double accumulatedDistance = Double.valueOf(redisTrackingService.getAccumulatedDistance(travelId));
         Duration durationInMinutes = Duration.between(actualTrip.getStartHourTravel(), actualTrip.getEndHourTravel());
@@ -144,7 +153,7 @@ public class TravelService {
                 actualTrip,
                 accumulatedDistance,
                 formattedDurationInMinutes,
-                actualTrip.getPolylineRoute(),
+                polylineEncoded,
                 Instant.now(),
                 studentSize,
                 (int) totalOccupancy,
@@ -152,6 +161,10 @@ public class TravelService {
                 );
 
         travelReportsRepository.save(travelReports);
+
+        // deleta os polylines para evitar lixo no banco
+        // obs.: passível de usar tarefas agendadas para apagar somente dps de um determinado tempo
+        travelLocationHistoryRepository.deleteAllByTravelId(travelId);
 
         travelRepository.save(actualTrip);
 
