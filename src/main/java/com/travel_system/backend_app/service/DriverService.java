@@ -3,11 +3,14 @@ package com.travel_system.backend_app.service;
 import com.travel_system.backend_app.exceptions.DuplicateResourceException;
 import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
 import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
+import com.travel_system.backend_app.exceptions.PermissionNotFoundException;
 import com.travel_system.backend_app.model.Driver;
+import com.travel_system.backend_app.model.Permissions;
 import com.travel_system.backend_app.model.dtos.request.DriverRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.DriverResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.repository.DriverRepository;
+import com.travel_system.backend_app.repository.PermissionsRepository;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,13 +26,14 @@ import java.util.UUID;
 
 @Service
 public class DriverService {
-    private DriverRepository repository;
-    private PasswordEncoder passwordEncoder;
+    private final DriverRepository repository;
+    private final PasswordEncoder passwordEncoder;
+    private final PermissionsRepository permissionsRepository;
 
-    @Autowired
-    public DriverService(DriverRepository repository, PasswordEncoder passwordEncoder) {
+    public DriverService(DriverRepository repository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository) {
         this.repository = repository;
         this.passwordEncoder = passwordEncoder;
+        this.permissionsRepository = permissionsRepository;
     }
 
     public List<DriverResponseDTO> getAllDrivers() {
@@ -62,12 +66,17 @@ public class DriverService {
         if (email.isPresent()) throw new RuntimeException("Email já existe");
         if (telephone.isPresent()) throw new RuntimeException("Telefone já existe");
 
-        // cryptography the password
         String rawPassword = newDriver.getPassword();
         newDriver.setPassword(passwordEncoder.encode(rawPassword));
 
         newDriver.setCreatedAt(LocalDateTime.now());
         newDriver.setStatus(GeneralStatus.ACTIVE);
+
+        final String ROLE_DRIVER = "ROLE_DRIVER";
+        Permissions admPerm = permissionsRepository.findByDescription(ROLE_DRIVER)
+                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + ROLE_DRIVER + " não encontrada."));
+
+        newDriver.setPermissions(List.of(admPerm));
 
         Driver savedDriver = repository.save(newDriver);
         return driverConverted(savedDriver);
