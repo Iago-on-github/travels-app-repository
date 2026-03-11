@@ -10,7 +10,7 @@ import java.util.List;
 @Service
 public class PolylineService {
 
-    public List<Point> formattedPolyline(String polylineRoute) {
+    public List<Point> formattedPolylineDecoded(String polylineRoute) {
         int precision = 5;
 
         if (polylineRoute.isEmpty()) {
@@ -18,5 +18,15 @@ public class PolylineService {
         }
 
         return PolylineUtils.decode(polylineRoute, precision);
+    }
+
+    public String formattedPolylineEncoded(List<Point> polylineRoute) {
+        int precision = 5;
+
+        if (polylineRoute.isEmpty()) {
+            throw new NoSuchCoordinates("Polyline está vazio, " + polylineRoute);
+        }
+
+        return PolylineUtils.encode(polylineRoute, precision);
     }
 }
