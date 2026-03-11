@@ -30,7 +30,7 @@ public class RouteCalculationService {
         double projLng = 0;
         double projLat = 0;
 
-        List<Point> decodePolyline = polylineService.formattedPolyline(polylineRoute);
+        List<Point> decodePolyline = polylineService.formattedPolylineDecoded(polylineRoute);
         Point driverCurrentLoc = Point.fromLngLat(currentLong, currentLat);
 
         if (decodePolyline.size() < 2) {
