@@ -29,7 +29,9 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth ->
                         auth.requestMatchers("/auth/signing").permitAll()
                                 .requestMatchers("/auth/refresh").permitAll()
-                                .requestMatchers("/admins/**").hasRole("ADMIN")
+                                .requestMatchers("/api/v1/auth/mqtt/**").permitAll()
+                                .requestMatchers("/admins/**").hasAuthority("ROLE_ADMIN")
+                                .requestMatchers("/api/v1/gps/**").hasAuthority("ROLE_DRIVER")
                                 .anyRequest().permitAll()
                 )
                 .cors(AbstractHttpConfigurer::disable)
