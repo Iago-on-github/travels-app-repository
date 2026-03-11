@@ -10,5 +10,7 @@ import java.util.UUID;
 
 @Repository
 public interface TravelLocationHistoryRepository extends JpaRepository<TravelLocationHistory, UUID> {
-    List<String> findAllByTravelIdOrderByRecordedAtAsc(UUID travelId);
+    List<TravelLocationHistory> findAllByTravelIdOrderByRecordedAtAsc(UUID travelId);
+
+    void deleteAllByTravelId(UUID travelId);
 }
