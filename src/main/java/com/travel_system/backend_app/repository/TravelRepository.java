@@ -19,4 +19,6 @@ public interface TravelRepository extends JpaRepository<Travel, UUID> {
     boolean existsByStudentIdAndTravelId(UUID studentId, UUID travelId);
 
     boolean existsByTravelIdAndTravelStatus(String travelId, TravelStatus travelStatus);
+
+    boolean existsByIdAndDriverId(UUID travelId, UUID driverId);
 }
