@@ -10,6 +10,7 @@ import com.travel_system.backend_app.model.dtos.response.LoginResponseDTO;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -109,10 +110,11 @@ public class TokenConfig {
         if (bearerToken != null && bearerToken.startsWith("Bearer ")) return bearerToken.substring("Bearer ".length());
 
         else return null;
-
     }
 
     // verifica se o token é valido ou não é expirado
+    // cache por alguns minutos (2)
+    @Cacheable(value = "validateToken", key = "#token")
     public Boolean validateToken(String token) {
         DecodedJWT decodedJWT = decodedToken(token);
         try {
