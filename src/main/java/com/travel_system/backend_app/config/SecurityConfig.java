@@ -18,6 +18,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @EnableWebSecurity
 public class SecurityConfig {
 
+    private final CorsSourceConfig corsSourceConfig;
+
+    public SecurityConfig(CorsSourceConfig corsSourceConfig) {
+        this.corsSourceConfig = corsSourceConfig;
+    }
+
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(TokenConfig tokenConfig) {
         return new JwtAuthenticationFilter(tokenConfig);
@@ -30,12 +36,14 @@ public class SecurityConfig {
                         auth.requestMatchers("/auth/signing").permitAll()
                                 .requestMatchers("/auth/refresh").permitAll()
                                 // permite para o servidor externo do rabbitmq
-                                .requestMatchers("/api/messaging/auth**").permitAll()
+                                .requestMatchers("/api/messaging/auth/**").permitAll()
                                 .requestMatchers("/admins/**").hasAuthority("ROLE_ADMIN")
                                 .requestMatchers("/api/v1/gps/**").hasAuthority("ROLE_DRIVER")
+                                // temporário para desenvolvimento
                                 .anyRequest().permitAll()
                 )
-                .cors(AbstractHttpConfigurer::disable)
+                .cors(cors ->
+                        cors.configurationSource(corsSourceConfig.corsConfigurationSource()))
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
