@@ -15,15 +15,13 @@ import com.travel_system.backend_app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
 import jakarta.transaction.Transactional;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static java.util.stream.Collectors.groupingBy;
-import static java.util.stream.Collectors.mapping;
 
 @Service
 public class TravelService {
@@ -219,10 +217,22 @@ public class TravelService {
         return linkedStudents.stream().map(this::studentTravelMapper).collect(Collectors.toSet());
     }
 
-    public boolean isStudentPresent(UUID studentId, UUID travelId) {
+    @Cacheable(value = "studentLogged", key = "#studentId + '-' + #travelId")
+    public boolean isStudentLogged(UUID studentId, UUID travelId) {
         return travelRepository.existsByStudentIdAndTravelId(studentId, travelId);
     }
 
+    @Cacheable(value = "driverLogged", key = "#userId + '-' + #travelId")
+    public boolean isDriverLogged(String userId, UUID travelId) {
+        // o "user" é o UUID do usuário logado
+        try {
+            UUID driverId = UUID.fromString(userId);
+
+            return travelRepository.existsByIdAndDriverId(travelId, driverId);
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
+    }
 
     // MÉTODOS AUXILIARES
     // MÉTODOS AUXILIARES
