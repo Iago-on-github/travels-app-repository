@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.controller;
 
 import com.travel_system.backend_app.config.TokenConfig;
+import com.travel_system.backend_app.repository.TravelRepository;
 import com.travel_system.backend_app.service.TravelService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,41 +56,46 @@ public class RabbitMQAuthController {
                                                        @RequestParam("resource") String resource,
                                                        @RequestParam("name") String name,
                                                        @RequestParam("permission") String permission) {
-        // permite leitura de exchanges públicas
-        if (permission.equals("read")) {
-            boolean isPublicExchange = name.equals("exchange.notifications") || name.equals("exchange.gps");
-            return isPublicExchange ? ResponseEntity.ok("allow") : ResponseEntity.ok("deny");
-        }
 
-        // nunca deixa o app criar/deletar e nunca deixa escrever em exchanges do sistema
-        if (permission.equals("write") || permission.equals("configure")) {
-            log.info("tentativa de escrita/configuração negada ao usuário: {}", username);
+        // nunca permite criar ou deletar estruturas no servidor
+        if (permission.equals("configure")) {
+            log.info("tentativa de configuração negada ao usuário: {}", username);
             return ResponseEntity.ok("deny");
         }
 
-        return ResponseEntity.ok("allow");
+        // permite leitura de exchanges públicas
+        if (permission.equals("read") || permission.equals("write")) {
+            boolean isTopicType = resource.equals("topic");
+            return isTopicType ? ResponseEntity.ok("allow") : ResponseEntity.ok("deny");
+        }
+
+        return ResponseEntity.ok("deny");
     }
 
     @PostMapping(value = "/topic", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
     public ResponseEntity<String> authenticateTopic(@RequestParam("user") String username, @RequestParam("routing_key") String routingKey, @RequestParam("permission") String permission) {
-        if (permission.equals("publish")) {
-            return ResponseEntity.ok("deny");
-        }
+        String[] routingKeyParts = routingKey.split("[/.]");
+        String travelIdStr = routingKeyParts[routingKeyParts.length - 1];
+
+        UUID travelId = UUID.fromString(travelIdStr);
+        UUID studentId = UUID.fromString(username);
 
         try {
-            String[] routingKeyParts = routingKey.split("\\.");
-            String travelIdStr = routingKeyParts[routingKeyParts.length - 1];
+            if (permission.equals("publish")) {
+                boolean isDriverLogged = travelService.isDriverLogged(username, travelId);
+                return isDriverLogged ? ResponseEntity.ok("allow") : ResponseEntity.ok("deny");
+            }
 
-            UUID travelId = UUID.fromString(travelIdStr);
-            UUID studentId = UUID.fromString(username);
-
-            boolean isAuth = travelService.isStudentPresent(studentId, travelId);
-
-            return isAuth ? ResponseEntity.ok("allow") : ResponseEntity.ok("deny");
+            if (permission.equals("subscribe")) {
+                boolean isStudentLogged = travelService.isStudentLogged(studentId, travelId);
+                return isStudentLogged ? ResponseEntity.ok("allow") : ResponseEntity.ok("deny");
+            }
         } catch (Exception e) {
             log.error("Erro na autorização de tópico para o usuário {}: {}", username, e.getMessage());
             return ResponseEntity.ok("deny");
         }
+
+        return ResponseEntity.ok("deny");
     }
 
 }
