@@ -10,7 +10,7 @@ import java.util.UUID;
 
 @Repository
 public interface TravelLocationHistoryRepository extends JpaRepository<TravelLocationHistory, UUID> {
-    List<TravelLocationHistory> findAllByTravelIdOrderByRecordedAtAsc(UUID travelId);
+    List<TravelLocationHistory> findAllByTravelIdOrderByTimestampAsc(UUID travelId);
 
     void deleteAllByTravelId(UUID travelId);
 }

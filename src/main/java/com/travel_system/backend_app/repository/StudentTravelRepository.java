@@ -17,4 +17,7 @@ public interface StudentTravelRepository extends JpaRepository<StudentTravel, UU
 
     @Query(value = "SELECT st.student.id from StudentTravel st WHERE st.travel.id = :travelId AND st.disembarkHour IS NULL ")
     List<UUID> findStudentIdsByTravelIdAndDisembarkHourIsNull(UUID travelId);
+
+    boolean existsByIdAndTravelId(UUID studentId, UUID travelId);
+
 }
