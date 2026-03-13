@@ -134,7 +134,7 @@ public class TravelService {
 
         // obtem os dados de lat/lng para formar a polyline da viagem
         List<TravelLocationHistory> travelRecorded = travelLocationHistoryRepository
-                .findAllByTravelIdOrderByRecordedAtAsc(travelId);
+                .findAllByTravelIdOrderByTimestampAsc(travelId);
 
         List<Point> pointList = travelRecorded.stream()
                 .map(t -> t.getLatitude() + ", " + t.getLongitude()).map(Point::fromJson).toList();
@@ -219,7 +219,7 @@ public class TravelService {
 
     @Cacheable(value = "studentLogged", key = "#studentId + '-' + #travelId")
     public boolean isStudentLogged(UUID studentId, UUID travelId) {
-        return travelRepository.existsByStudentIdAndTravelId(studentId, travelId);
+        return studentTravelRepository.existsByIdAndTravelId(studentId, travelId);
     }
 
     @Cacheable(value = "driverLogged", key = "#userId + '-' + #travelId")
