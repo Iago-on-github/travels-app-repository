@@ -47,7 +47,7 @@ public class GpsMessagingListener {
 
         MessagingDTO messagingDTO = new MessagingDTO(latitude, longitude, heading, speed, timestamp, travelId);
 
-        gpsService.sendLocalization(cityNameFormatted, travelId, messagingDTO);
+        gpsService.sendLocalizationToNotification(cityNameFormatted, travelId, messagingDTO);
     }
 
 }
