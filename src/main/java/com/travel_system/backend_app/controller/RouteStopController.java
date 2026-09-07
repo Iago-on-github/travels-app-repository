@@ -54,12 +54,10 @@ public class RouteStopController {
             @ApiResponse(responseCode = "401", description = "Não autenticado. Token JWT ausente, expirado ou inválido.",
                     content = @Content(schema = @Schema(hidden = true)))
     })
-    @GetMapping("/{customerId}/customer")
-    public ResponseEntity<List<RouteStopResponseDTO>> getRouteStopsByCustomer(
-            @Parameter(description = "ID único (UUID) do Customer cujos pontos de parada serão listados.", required = true)
-            @PathVariable UUID customerId) {
+    @GetMapping("/customer")
+    public ResponseEntity<List<RouteStopResponseDTO>> getRouteStopsByCustomer() {
 
-        return ResponseEntity.ok().body(routeStopService.getRouteStopsByCustomer(customerId));
+        return ResponseEntity.ok().body(routeStopService.getRouteStopsByCustomer());
     }
 
     @Operation(

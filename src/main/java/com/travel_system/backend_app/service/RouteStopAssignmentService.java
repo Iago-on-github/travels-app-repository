@@ -3,18 +3,17 @@ package com.travel_system.backend_app.service;
 import com.mapbox.geojson.Point;
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.interfaces.mappers.StandardRouteRequestMapper;
-import com.travel_system.backend_app.interfaces.mappers.StandardRouteResponseMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.StandardRouteResponseMapper;
 import com.travel_system.backend_app.model.RouteStop;
 import com.travel_system.backend_app.model.RouteStopAssignment;
 import com.travel_system.backend_app.model.StandardRoute;
-import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.request.RouteStopReorderRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.StandardRouteResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.repository.RouteStopRepository;
 import com.travel_system.backend_app.repository.StandardRouteRepository;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -33,7 +32,7 @@ public class RouteStopAssignmentService {
 
     private final MapboxAPIService mapboxAPIService;
 
-    public RouteStopAssignmentService(StandardRouteRepository standardRouteRepository, RouteStopRepository routeStopRepository, UserRepository userRepository, StandardRouteRequestMapper standardRouteRequestMapper, StandardRouteResponseMapper standardRouteResponseMapper, CurrentUserService currentUserService, MapboxAPIService mapboxAPIService) {
+    public RouteStopAssignmentService(StandardRouteRepository standardRouteRepository, RouteStopRepository routeStopRepository, UserAccountRepository userAccountRepository, StandardRouteRequestMapper standardRouteRequestMapper, StandardRouteResponseMapper standardRouteResponseMapper, CurrentUserService currentUserService, MapboxAPIService mapboxAPIService) {
         this.standardRouteRepository = standardRouteRepository;
         this.routeStopRepository = routeStopRepository;
         this.standardRouteResponseMapper = standardRouteResponseMapper;

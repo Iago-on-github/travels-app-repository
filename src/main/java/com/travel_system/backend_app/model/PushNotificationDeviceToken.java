@@ -7,41 +7,42 @@ import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "push_notification_tokens")
-public class DeviceToken extends BaseTenantEntity {
+@Table(name = "push_notification_device_tokens")
+public class PushNotificationDeviceToken extends BaseTenantEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private UserModel user;
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "user_account_id", nullable = false)
+    private UserAccount userAccount;
+    @Column(nullable = false, unique = true)
     private String token;
     @Enumerated(EnumType.STRING)
     private Platform platform;
+    @Column(nullable = false)
     private boolean active = true;
-    @Enumerated(EnumType.STRING)
-    private NotificationAudience notificationAudience;
     @CreatedDate
-    @Column(name = "created_at", updatable = false)
-    private LocalDateTime createdAt;
+    @Column(updatable = false)
+    private Instant createdAt;
     @LastModifiedDate
-    @Column(name = "updated_at")
-    private LocalDateTime updatedAt;
+    private Instant updatedAt;
 
-    public DeviceToken() {
+    public PushNotificationDeviceToken() {
     }
 
-    public DeviceToken(UUID id, UserModel userModel, String token, Platform platform, boolean active, NotificationAudience notificationAudience) {
+    public PushNotificationDeviceToken(UUID id, UserAccount userAccount, String token, Platform platform, boolean active, Instant createdAt, Instant updatedAt) {
         this.id = id;
-        this.user = userModel;
+        this.userAccount = userAccount;
         this.token = token;
         this.platform = platform;
         this.active = active;
-        this.notificationAudience = notificationAudience;
+        this.createdAt = createdAt;
+        this.updatedAt = updatedAt;
     }
 
     public UUID getId() {
@@ -52,12 +53,12 @@ public class DeviceToken extends BaseTenantEntity {
         this.id = id;
     }
 
-    public UserModel getUser() {
-        return user;
+    public UserAccount getUserAccount() {
+        return userAccount;
     }
 
-    public void setUser(UserModel user) {
-        this.user = user;
+    public void setUserAccount(UserAccount userAccount) {
+        this.userAccount = userAccount;
     }
 
     public String getToken() {
@@ -84,27 +85,19 @@ public class DeviceToken extends BaseTenantEntity {
         this.active = active;
     }
 
-    public NotificationAudience getNotificationAudience() {
-        return notificationAudience;
-    }
-
-    public void setNotificationAudience(NotificationAudience notificationAudience) {
-        this.notificationAudience = notificationAudience;
-    }
-
-    public LocalDateTime getCreatedAt() {
+    public Instant getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(LocalDateTime createdAt) {
+    public void setCreatedAt(Instant createdAt) {
         this.createdAt = createdAt;
     }
 
-    public LocalDateTime getUpdatedAt() {
+    public Instant getUpdatedAt() {
         return updatedAt;
     }
 
-    public void setUpdatedAt(LocalDateTime updatedAt) {
+    public void setUpdatedAt(Instant updatedAt) {
         this.updatedAt = updatedAt;
     }
 }

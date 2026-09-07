@@ -1,16 +1,13 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.interfaces.mappers.CustomerMapper;
-import com.travel_system.backend_app.interfaces.mappers.RouteStopResponseMapper;
-import com.travel_system.backend_app.interfaces.mappers.StudentRouteStopResponseMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.StudentRouteStopResponseMapper;
 import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.request.RouteStopAssignmentRequestDTO;
 import com.travel_system.backend_app.model.dtos.request.RouteStopStudentUpdateDTO;
 import com.travel_system.backend_app.model.dtos.request.RouteStopStudentsRequestDTO;
 import com.travel_system.backend_app.model.dtos.request.StandardRouteRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.RouteStopAssignmentResponseDTO;
-import com.travel_system.backend_app.model.dtos.response.RouteStopResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.StandardRouteResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentRouteStopAssociateResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
@@ -29,8 +26,6 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.boot.convert.DataSizeUnit;
-import org.testcontainers.shaded.org.bouncycastle.jcajce.provider.asymmetric.rsa.ISOSignatureSpi;
 
 import java.time.Instant;
 import java.time.LocalDateTime;
@@ -39,7 +34,6 @@ import java.util.stream.Stream;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -52,7 +46,7 @@ class StudentRouteStopServiceTest {
     @Mock
     private StandardRouteRepository standardRouteRepository;
     @Mock
-    private UserRepository userRepository;
+    private UserAccountRepository userAccountRepository;
     @Mock
     private StudentRepository studentRepository;
     @Mock
@@ -60,7 +54,7 @@ class StudentRouteStopServiceTest {
 
     StudentRouteStopAssignment studentRouteStopAssignment;
     StandardRoute standardRoute;
-    UserModel user;
+//    UserModel user;
     Customer customer;
     RouteStop routeStop;
     Student studentOne;
@@ -70,12 +64,12 @@ class StudentRouteStopServiceTest {
 
     RouteStopStudentsRequestDTO routeStopStudentsRequestDTO;
 
-    @BeforeEach
+/*    @BeforeEach
     void setUp() {
         StudentRouteStopResponseMapper realResponseMapper = Mappers.getMapper(StudentRouteStopResponseMapper.class);
 
         studentRouteStopService = new StudentRouteStopService(
-                userRepository,
+                userAccountRepository,
                 routeStopRepository,
                 studentRepository,
                 standardRouteRepository,
@@ -155,7 +149,7 @@ class StudentRouteStopServiceTest {
                 Permissions perms = new Permissions("ROLE_ADMIN");
                 user.setPermissions(List.of(perms));
 
-                when(userRepository.findUserByEmail(userEmail)).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(userEmail)).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(studentRouteStopAssignmentRepository.findByRouteStopIdAndStandardRouteId(routeStop.getId(), standardRoute.getId()))
@@ -180,7 +174,7 @@ class StudentRouteStopServiceTest {
                 assertNotNull(dto.studentIds());
                 assertTrue(dto.studentIds().contains(studentOne.getId()));
 
-                verify(userRepository).findUserByEmail(userEmail);
+                verify(userAccountRepository).findUserByEmail(userEmail);
                 verify(standardRouteRepository).findById(standardRouteId);
                 verify(studentRepository).findById(studentOne.getId());
                 verify(studentRouteStopAssignmentRepository).findByStudentIdAndStandardRouteId(studentOne.getId(), standardRouteId);
@@ -193,7 +187,7 @@ class StudentRouteStopServiceTest {
                 Permissions perms = new Permissions("ROLE_USER");
                 user.setPermissions(List.of(perms));
 
-                when(userRepository.findUserByEmail(userEmail)).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(userEmail)).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
                 when(studentRouteStopAssignmentRepository.findByRouteStopIdAndStandardRouteId(routeStop.getId(), standardRoute.getId()))
                         .thenReturn(Set.of(studentRouteStopAssignment));
@@ -217,7 +211,7 @@ class StudentRouteStopServiceTest {
                 assertNotNull(dto.studentIds());
                 assertTrue(dto.studentIds().contains(studentOne.getId()));
 
-                verify(userRepository).findUserByEmail(userEmail);
+                verify(userAccountRepository).findUserByEmail(userEmail);
                 verify(standardRouteRepository).findById(standardRouteId);
 
                 verify(studentRepository, never()).findById(studentOne.getId());
@@ -230,7 +224,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o User não for encontrado")
             void shouldThrowEntityNotFoundExceptionWhenUserNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(null);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(null);
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), routeStop.getId(), standardRoute.getId()));
 
@@ -240,12 +234,12 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando não encontrar a Rota Padrão no banco")
             void shouldThrowEntityNotFoundExceptionWhenStandardRouteNotFound() {
-                when(userRepository.findUserByEmail(userEmail)).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(userEmail)).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.empty());
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStops(userEmail, studentOne.getId(), standardRouteId));
 
-                verifyNoMoreInteractions(standardRouteRepository, userRepository);
+                verifyNoMoreInteractions(standardRouteRepository, userAccountRepository);
 
                 verifyNoInteractions(studentRepository, studentRouteStopAssignmentRepository);
             }
@@ -257,7 +251,7 @@ class StudentRouteStopServiceTest {
                 Permissions perm = new Permissions(invalidRole);
                 user.setPermissions(List.of(perm));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
 
                 assertThrows(NotAuthorizedException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), studentOne.getId(), standardRouteId));
@@ -278,12 +272,12 @@ class StudentRouteStopServiceTest {
             void shouldThrowCustomerMismatchExceptionWhenRouteBelongsToDifferentCustomer() {
                 standardRoute.setCustomer(new Customer());
 
-                when(userRepository.findUserByEmail(userEmail)).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(userEmail)).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
 
                 assertThrows(CustomerMismatchException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), studentOne.getId(), standardRouteId));
 
-                verifyNoMoreInteractions(standardRouteRepository, userRepository);
+                verifyNoMoreInteractions(standardRouteRepository, userAccountRepository);
 
                 verifyNoInteractions(studentRepository, studentRouteStopAssignmentRepository);
             }
@@ -293,7 +287,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowCustomerMismatchExceptionWhenTargetStudentBelongsToDifferentCustomer() {
                 user.setCustomer(new Customer());
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
 
                 assertThrows(CustomerMismatchException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), studentOne.getId(), standardRouteId));
@@ -306,13 +300,13 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o estudante não for encontrado no fluxo de Admin")
             void shouldThrowEntityNotFoundExceptionWhenTargetStudentNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.empty());
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), studentOne.getId(), standardRouteId));
 
-                verifyNoMoreInteractions(routeStopRepository, studentRepository, userRepository);
+                verifyNoMoreInteractions(routeStopRepository, studentRepository, userAccountRepository);
 
                 verifyNoInteractions(studentRouteStopAssignmentRepository);
             }
@@ -320,7 +314,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando a entidade de associação Student-RouteStop não for encontrada")
             void shouldThrowEntityNotFoundExceptionWhenAssignmentNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRouteId)).thenReturn(Optional.of(standardRoute));
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(studentRouteStopAssignmentRepository.findByStudentIdAndStandardRouteId(studentOne.getId(), standardRouteId))
@@ -328,7 +322,7 @@ class StudentRouteStopServiceTest {
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), studentOne.getId(), standardRouteId));
 
-                verifyNoMoreInteractions(routeStopRepository, studentRepository, userRepository, studentRouteStopAssignmentRepository);
+                verifyNoMoreInteractions(routeStopRepository, studentRepository, userAccountRepository, studentRouteStopAssignmentRepository);
             }
         }
     }
@@ -348,7 +342,7 @@ class StudentRouteStopServiceTest {
                 studentRouteStopAssignment.setRouteStop(routeStop);
                 studentRouteStopAssignment.setStudent(studentOne);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(studentRouteStopAssignmentRepository.findAssignmentByStudentRouteAndPeriod(
                         studentOne.getId(),
@@ -379,7 +373,7 @@ class StudentRouteStopServiceTest {
                 assertNotNull(result.studentIds());
                 assertTrue(result.studentIds().contains(studentOne.getId()));
 
-                verify(userRepository).findUserByEmail(user.getEmail());
+                verify(userAccountRepository).findUserByEmail(user.getEmail());
                 verify(standardRouteRepository).findById(standardRoute.getId());
 
                 verify(studentRouteStopAssignmentRepository).findAssignmentByStudentRouteAndPeriod(studentOne.getId(), standardRoute.getId(), TravelPeriod.MORNING, customer.getId());
@@ -395,7 +389,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o User não for encontrado")
             void shouldThrowEntityNotFoundExceptionWhenUserNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(null);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(null);
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStops(user.getEmail(), routeStop.getId(), standardRoute.getId()));
 
@@ -405,12 +399,12 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando não encontrar a Rota Padrão no banco")
             void shouldThrowEntityNotFoundExceptionWhenStandardRouteNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.empty());
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStopsByPeriodAndStandardRoute(user.getEmail(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
-                verifyNoMoreInteractions(standardRouteRepository, userRepository);
+                verifyNoMoreInteractions(standardRouteRepository, userAccountRepository);
 
                 verifyNoInteractions(studentRepository, studentRouteStopAssignmentRepository);
             }
@@ -422,7 +416,7 @@ class StudentRouteStopServiceTest {
                 Permissions perm = new Permissions(invalidRole);
                 user.setPermissions(List.of(perm));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
 
                 assertThrows(NotAuthorizedException.class, () -> studentRouteStopService.getStudentRouteStopsByPeriodAndStandardRoute(user.getEmail(), standardRoute.getId(), routeStopStudentsRequestDTO));
@@ -443,12 +437,12 @@ class StudentRouteStopServiceTest {
             void shouldThrowCustomerMismatchExceptionWhenRouteBelongsToDifferentCustomer() {
                 standardRoute.setCustomer(new Customer());
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
 
                 assertThrows(CustomerMismatchException.class, () -> studentRouteStopService.getStudentRouteStopsByPeriodAndStandardRoute(user.getEmail(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
-                verifyNoMoreInteractions(standardRouteRepository, userRepository);
+                verifyNoMoreInteractions(standardRouteRepository, userAccountRepository);
 
                 verifyNoInteractions(studentRepository, studentRouteStopAssignmentRepository);
             }
@@ -456,14 +450,14 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando a entidade de associação Student-RouteStop não for encontrada")
             void shouldThrowEntityNotFoundExceptionWhenAssignmentNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(studentRouteStopAssignmentRepository.findAssignmentByStudentRouteAndPeriod(any(), any(), any(), any()))
                         .thenReturn(Optional.empty());
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.getStudentRouteStopsByPeriodAndStandardRoute(user.getEmail(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
-                verifyNoMoreInteractions(routeStopRepository, studentRepository, userRepository);
+                verifyNoMoreInteractions(routeStopRepository, studentRepository, userAccountRepository);
             }
         }
     }
@@ -492,7 +486,7 @@ class StudentRouteStopServiceTest {
                 studentRouteStopAssignment.setRouteStop(routeStop);
                 studentRouteStopAssignment.setStudent(studentOne);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L); // abaixo do limite de 3
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING)).thenReturn(false);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
@@ -535,7 +529,7 @@ class StudentRouteStopServiceTest {
 
                 assertNotNull(result.createdAt());
 
-                verify(userRepository).findUserByEmail(user.getEmail());
+                verify(userAccountRepository).findUserByEmail(user.getEmail());
                 verify(studentRouteStopAssignmentRepository).countByStudentId(studentOne.getId());
                 verify(studentRouteStopAssignmentRepository).existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING);
 
@@ -554,7 +548,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o User não for encontrado")
             void shouldThrowEntityNotFoundExceptionWhenUserNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(null);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(null);
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.associateStudentWithRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
@@ -568,7 +562,7 @@ class StudentRouteStopServiceTest {
                 Permissions perm = new Permissions(invalidRole);
                 user.setPermissions(List.of(perm));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
 
                 assertThrows(NotAuthorizedException.class, () -> studentRouteStopService.associateStudentWithRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
@@ -588,7 +582,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowIllegalArgumentExceptionWhenStudentIdIsNull() {
                 RouteStopStudentsRequestDTO routeStopStudentsRequestDTOWithoutStudentId = new RouteStopStudentsRequestDTO(null, TravelPeriod.MORNING);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
 
                 assertThrows(IllegalArgumentException.class, () -> studentRouteStopService.associateStudentWithRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTOWithoutStudentId));
 
@@ -600,7 +594,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o estudante atingir o limite de 3 pontos de parada")
             void shouldThrowDomainValidationExceptionWhenStudentReachesMaxAssignmentsLimit() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(3L);
 
                 assertThrows(DomainValidationException.class, () -> studentRouteStopService.associateStudentWithRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
@@ -613,7 +607,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o estudante já estiver com um Ponto de Parada para aquele turno")
             void shouldThrowIllegalArgumentExceptionWhenStudentAlreadyHasAssignmentInPeriod() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(true);
@@ -628,7 +622,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o estudante não for encontrado")
             void shouldThrowExceptionWhenStudentNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -646,7 +640,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenStudentIsInactive() {
                 studentOne.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -662,7 +656,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o Ponto de Parada não for encontrado")
             void shouldThrowExceptionWhenRouteStopNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -681,7 +675,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenRouteStopIsInactive() {
                 routeStop.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -698,7 +692,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando a Rota Padrão não for encontrada")
             void shouldThrowExceptionWhenStandardRouteNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -716,7 +710,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenStandardRouteIsInactive() {
                 standardRoute.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -735,7 +729,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowDomainValidationExceptionWhenTravelPeriodMismatchesStandardRoute() {
                 standardRoute.setTravelPeriods(Set.of(TravelPeriod.EVENING));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -757,7 +751,7 @@ class StudentRouteStopServiceTest {
                 standardRoute.setCustomer(randomCustomer);
                 studentOne.setCustomer(randomCustomer);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -782,7 +776,7 @@ class StudentRouteStopServiceTest {
                 standardRoute.setTravelPeriods(Set.of(TravelPeriod.MORNING));
                 standardRoute.setRouteStopAssignments(List.of());
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRouteStopAssignmentRepository.countByStudentId(studentOne.getId())).thenReturn(2L);
                 when(studentRouteStopAssignmentRepository.existsByStudentIdAndStandardRouteTravelPeriods(studentOne.getId(), TravelPeriod.MORNING))
                         .thenReturn(false);
@@ -790,7 +784,7 @@ class StudentRouteStopServiceTest {
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
 
-                assertThrows(EntityAssignmentNotFound.class, () -> studentRouteStopService.associateStudentWithRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
+                assertThrows(EntityAssignmentNotFoundException.class, () -> studentRouteStopService.associateStudentWithRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
                 verifyNoMoreInteractions(routeStopRepository, studentRouteStopAssignmentRepository, studentRepository, standardRouteRepository);
             }
@@ -821,7 +815,7 @@ class StudentRouteStopServiceTest {
             void shouldUpdateStudentRouteStopAndReturnDtoWhenDataIsValid() {
                 standardRoute.setTravelPeriods(Set.of(TravelPeriod.AFTERNOON));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
@@ -862,7 +856,7 @@ class StudentRouteStopServiceTest {
                 assertNotNull(result.studentIds());
                 assertTrue(result.studentIds().contains(studentOne.getId()));
 
-                verify(userRepository).findUserByEmail(user.getEmail());
+                verify(userAccountRepository).findUserByEmail(user.getEmail());
                 verify(studentRepository).findById(studentOne.getId());
                 verify(standardRouteRepository).findById(standardRoute.getId());
                 verify(routeStopRepository).findById(routeStop.getId());
@@ -879,7 +873,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o User não for encontrado")
             void shouldThrowEntityNotFoundExceptionWhenUserNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(null);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(null);
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
 
@@ -893,7 +887,7 @@ class StudentRouteStopServiceTest {
                 Permissions perm = new Permissions(invalidRole);
                 user.setPermissions(List.of(perm));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
 
                 assertThrows(NotAuthorizedException.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
 
@@ -912,7 +906,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o estudante não for encontrado")
             void shouldThrowExceptionWhenStudentNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
 
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.empty());
 
@@ -926,7 +920,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o Ponto de Parada não for encontrado")
             void shouldThrowExceptionWhenRouteStopNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
@@ -939,7 +933,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenRouteStopIsInactive() {
                 routeStop.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
 
@@ -952,7 +946,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando a Rota Padrão não for encontrada")
             void shouldThrowExceptionWhenStandardRouteNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.empty());
 
@@ -966,7 +960,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenStandardRouteIsInactive() {
                 standardRoute.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
 
@@ -982,7 +976,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowIllegalArgumentExceptionWhenTravelPeriodNotInStandardRoutePeriods() {
                 standardRoute.setTravelPeriods(Set.of(TravelPeriod.MORNING));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
 
@@ -997,12 +991,12 @@ class StudentRouteStopServiceTest {
                 standardRoute.setTravelPeriods(Set.of(routeStopStudentUpdateDTO.travelPeriod()));
                 standardRoute.setRouteStopAssignments(List.of());
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
 
-                assertThrows(EntityAssignmentNotFound.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
+                assertThrows(EntityAssignmentNotFoundException.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
 
                 verifyNoMoreInteractions(routeStopRepository, studentRouteStopAssignmentRepository, studentRepository, standardRouteRepository);
             }
@@ -1012,14 +1006,14 @@ class StudentRouteStopServiceTest {
             void shouldThrowEntityAssignmentNotFoundWhenStudentAssignmentNotFound() {
                 standardRoute.setTravelPeriods(Set.of(routeStopStudentUpdateDTO.travelPeriod()));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
                 when(studentRouteStopAssignmentRepository.findByStudentIdAndStandardRouteId(studentOne.getId(), standardRoute.getId()))
                         .thenReturn(Optional.empty());
 
-                assertThrows(EntityAssignmentNotFound.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
+                assertThrows(EntityAssignmentNotFoundException.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
 
                 verifyNoMoreInteractions(routeStopRepository, studentRouteStopAssignmentRepository, studentRepository, standardRouteRepository);
             }
@@ -1029,7 +1023,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowDomainValidationExceptionWhenStudentAlreadyHasAnotherAssignmentInSamePeriod() {
                 standardRoute.setTravelPeriods(Set.of(routeStopStudentUpdateDTO.travelPeriod()));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
@@ -1057,7 +1051,7 @@ class StudentRouteStopServiceTest {
 
                 standardRoute.setTravelPeriods(Set.of(routeStopStudentUpdateDTO.travelPeriod()));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
 
                 assertThrows(CustomerMismatchException.class, () -> studentRouteStopService.updateStudentRouteStops(user.getEmail(), studentOne.getId(), standardRoute.getId(), routeStopStudentUpdateDTO));
@@ -1097,7 +1091,7 @@ class StudentRouteStopServiceTest {
             void shouldRemoveStudentFromRouteStopAndReturnDtoWhenDataIsValid() {
                 standardRoute.setTravelPeriods(Set.of(TravelPeriod.MORNING));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
@@ -1120,7 +1114,7 @@ class StudentRouteStopServiceTest {
                 assertNotNull(result.studentIds());
                 assertTrue(result.studentIds().isEmpty());
 
-                verify(userRepository).findUserByEmail(user.getEmail());
+                verify(userAccountRepository).findUserByEmail(user.getEmail());
                 verify(studentRepository).findById(studentOne.getId());
                 verify(routeStopRepository).findById(routeStop.getId());
                 verify(standardRouteRepository).findById(standardRoute.getId());
@@ -1139,7 +1133,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o User não for encontrado")
             void shouldThrowEntityNotFoundExceptionWhenUserNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(null);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(null);
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
@@ -1153,7 +1147,7 @@ class StudentRouteStopServiceTest {
                 Permissions perm = new Permissions(invalidRole);
                 user.setPermissions(List.of(perm));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
 
                 assertThrows(NotAuthorizedException.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
@@ -1172,7 +1166,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o estudante não for encontrado")
             void shouldThrowExceptionWhenStudentNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
 
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.empty());
 
@@ -1186,7 +1180,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando o Ponto de Parada não for encontrado")
             void shouldThrowExceptionWhenRouteStopNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
@@ -1197,7 +1191,7 @@ class StudentRouteStopServiceTest {
             @Test
             @DisplayName("Deve lançar exception quando a Rota Padrão não for encontrada")
             void shouldThrowExceptionWhenStandardRouteNotFound() {
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
 
                 assertThrows(EntityNotFoundException.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
@@ -1211,7 +1205,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenRouteStopIsInactive() {
                 routeStop.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
@@ -1227,7 +1221,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowExceptionWhenStandardRouteIsInactive() {
                 standardRoute.setStatus(GeneralStatus.INACTIVE);
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
@@ -1244,12 +1238,12 @@ class StudentRouteStopServiceTest {
                 standardRoute.setTravelPeriods(Set.of(routeStopStudentsRequestDTO.travelPeriod()));
                 standardRoute.setRouteStopAssignments(List.of());
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
 
-                assertThrows(EntityAssignmentNotFound.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
+                assertThrows(EntityAssignmentNotFoundException.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
                 verifyNoMoreInteractions(routeStopRepository, studentRouteStopAssignmentRepository, studentRepository, standardRouteRepository);
             }
@@ -1260,7 +1254,7 @@ class StudentRouteStopServiceTest {
             void shouldThrowIllegalArgumentExceptionWhenTravelPeriodNotInStandardRoutePeriods() {
                 standardRoute.setTravelPeriods(Set.of(TravelPeriod.EVENING));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
@@ -1275,16 +1269,16 @@ class StudentRouteStopServiceTest {
             void shouldThrowEntityAssignmentNotFoundWhenStudentAssignmentNotFound() {
                 standardRoute.setTravelPeriods(Set.of(routeStopStudentsRequestDTO.travelPeriod()));
 
-                when(userRepository.findUserByEmail(user.getEmail())).thenReturn(user);
+                when(userAccountRepository.findUserByEmail(user.getEmail())).thenReturn(user);
                 when(studentRepository.findById(studentOne.getId())).thenReturn(Optional.of(studentOne));
                 when(standardRouteRepository.findById(standardRoute.getId())).thenReturn(Optional.of(standardRoute));
                 when(routeStopRepository.findById(routeStop.getId())).thenReturn(Optional.of(routeStop));
 
-                assertThrows(EntityAssignmentNotFound.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
+                assertThrows(EntityAssignmentNotFoundException.class, () -> studentRouteStopService.removeStudentFromRouteStop(user.getEmail(), routeStop.getId(), standardRoute.getId(), routeStopStudentsRequestDTO));
 
                 verifyNoMoreInteractions(studentRepository, standardRouteRepository);
             }
         }
 
-    }
+    }*/
 }

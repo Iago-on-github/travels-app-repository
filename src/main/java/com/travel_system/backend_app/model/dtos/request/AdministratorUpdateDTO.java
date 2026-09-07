@@ -8,6 +8,7 @@ public record AdministratorUpdateDTO(
         String password,
         String name,
         String lastName,
-        String telephone
+        String telephone,
+        String jobTitle
 ) {
 }

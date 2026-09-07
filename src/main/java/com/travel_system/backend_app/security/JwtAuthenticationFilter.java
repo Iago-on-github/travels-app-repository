@@ -1,7 +1,15 @@
 package com.travel_system.backend_app.security;
 
 import com.travel_system.backend_app.config.TokenConfig;
+import com.travel_system.backend_app.exceptions.DomainValidationException;
 import com.travel_system.backend_app.infrastructure.TenantContext;
+import com.travel_system.backend_app.model.Customer;
+import com.travel_system.backend_app.model.UserAccount;
+import com.travel_system.backend_app.repository.CustomerRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
+import com.travel_system.backend_app.service.CurrentUserService;
+import com.travel_system.backend_app.service.UserProfileResolverService;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,9 +25,18 @@ import java.util.UUID;
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final TokenConfig tokenConfig;
+    private final CurrentUserService currentUserService;
+    private final UserProfileResolverService userProfileResolverService;
 
-    public JwtAuthenticationFilter(TokenConfig tokenConfig) {
+    private final CustomerRepository customerRepository;
+    private final UserAccountRepository userAccountRepository;
+
+    public JwtAuthenticationFilter(TokenConfig tokenConfig, CurrentUserService currentUserService, UserProfileResolverService userProfileResolverService, CustomerRepository customerRepository, UserAccountRepository userAccountRepository) {
         this.tokenConfig = tokenConfig;
+        this.currentUserService = currentUserService;
+        this.userProfileResolverService = userProfileResolverService;
+        this.customerRepository = customerRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     @Override
@@ -35,6 +52,8 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     Authentication authentication = tokenConfig.getAuthentication(token);
                     if (authentication != null) {
                         SecurityContextHolder.getContext().setAuthentication(authentication);
+
+                        System.out.println("processing first doFilterInternal");
 
                         // processa e define o tenant (seja por Token ou por impersonação)
                         resolveTenantContext(token, request);
@@ -53,34 +72,64 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     protected void resolveTenantContext(String token, HttpServletRequest request) {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
-        boolean isPlatformAdmin = authentication.getAuthorities().stream().anyMatch(a -> a.getAuthority().equals("ROLE_PLATFORM_ADMIN"));
+        System.out.println("processing resolveTenantContext");
 
-        // caso seja um administrador da plataforma
+        boolean isPlatformAdmin = currentUserService.isPlatformAdmin();
+
+        // platformAdmin atuando em um Customer específico
         if (isPlatformAdmin) {
             String impersonatedTenantHeader = request.getHeader("X-Customer-ID");
 
             if (impersonatedTenantHeader != null && !impersonatedTenantHeader.isBlank()) {
                 try {
-                    TenantContext.setCurrentTenant(UUID.fromString(impersonatedTenantHeader));
+                    UUID customerId = UUID.fromString(impersonatedTenantHeader);
+
+                    if (!customerRepository.existsById(customerId)) {
+                        throw new EntityNotFoundException(
+                                "Customer provido do header não existe"
+                        );
+                    }
+
+                    TenantContext.setCurrentTenant(customerId);
                     return;
+
                 } catch (IllegalArgumentException e) {
-                    // se o UUID do header for inválido, limpa o contexto garantindo a consulta global sem crash
-                    TenantContext.removeCurrentTenant();
-                    return;
+                    throw new DomainValidationException(
+                            "Header 'X-Customer-ID' inválido"
+                    );
                 }
             }
 
+            // platformAdmin sem impersonação permanece sem tenant
+            return;
         }
 
-        UUID customerIdFromToken = tokenConfig.getCustomerIdFromToken(token);
+        /*
+         * Usuário comum:
+         * o JWT identifica a UserAccount, mas não é a fonte do customerId
+         */
+        String email = tokenConfig.getAuthentication(token).getName();
 
-        // caso seja um usuário do tipo tenant
-        if (customerIdFromToken != null) {
-            TenantContext.setCurrentTenant(customerIdFromToken);
+        UserAccount userAccount = userAccountRepository.findUserByEmail(email);
+
+        if (userAccount == null) {
+            throw new EntityNotFoundException("UserAccount não encontrada");
         }
 
+        UUID customerId = userProfileResolverService.resolveCustomerId(userAccount);
+
+        System.out.println("customerId from resolveTenantContext: " + customerId);
+
+        /*
+         * UNASSIGNED: ainda não possui perfil/Customer.
+         */
+        if (customerId == null) {
+            TenantContext.removeCurrentTenant();
+            return;
+        }
+
+        TenantContext.setCurrentTenant(customerId);
     }
 
     /*

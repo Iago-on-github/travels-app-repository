@@ -2,6 +2,7 @@ package com.travel_system.backend_app.listeners;
 
 import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.exceptions.EtaDataStatesInvalidException;
+import com.travel_system.backend_app.infrastructure.TenantFilterAspect;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
 import com.travel_system.backend_app.repository.TravelRepository;
@@ -21,18 +22,24 @@ import java.util.UUID;
 public class LocationProcessingListener {
     private final TravelTrackingService travelTrackingService;
     private final PushNotificationService pushNotificationService;
+    private final TenantFilterAspect tenantFilterAspect;
 
     private final Logger logger = LoggerFactory.getLogger(LocationProcessingListener.class);
 
-    public LocationProcessingListener(TravelTrackingService travelTrackingService, PushNotificationService pushNotificationService) {
+    public LocationProcessingListener(TravelTrackingService travelTrackingService, PushNotificationService pushNotificationService, TenantFilterAspect tenantFilterAspect) {
         this.travelTrackingService = travelTrackingService;
         this.pushNotificationService = pushNotificationService;
+        this.tenantFilterAspect = tenantFilterAspect;
     }
 
     @Async
     @EventListener
     public void handleLocationProcessing(NewLocationReceivedEvents locationReceivedEvents) {
         VehicleLocationRequestDTO vehicleLocationRequest = getVehicleLocationRequestDTO(locationReceivedEvents);
+
+        // aplica o filtro de customer manualmente antes de acessar o banco
+        tenantFilterAspect.applyFilter();
+
         try {
             travelTrackingService.processNewLocation(vehicleLocationRequest);
         } catch(EtaDataStatesInvalidException e) {

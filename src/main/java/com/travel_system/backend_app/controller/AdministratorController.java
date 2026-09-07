@@ -160,7 +160,7 @@ public class AdministratorController {
         return ResponseEntity.created(uri).body(newAdm);
     }
 
-    @Operation(
+/*    @Operation(
             summary = "Criar um novo Administrador da Plataforma",
             description = "Cadastra um novo administrador da Plataforma no sistema, valida duplicidade de dados e vincula a permissão 'ROLE_PLATFORM_ADMIN'." +
                     "Ele é um Administrator comum, porém com maiores permissões capaz de acessar recursos críticos do próprio sistema. Pode ser criado apenas por outro Platform Administrator.",
@@ -187,7 +187,7 @@ public class AdministratorController {
         URI uri = componentsBuilder.path("/{id}").buildAndExpand(platformAdministrator.id()).toUri();
 
         return ResponseEntity.created(uri).body(platformAdministrator);
-    }
+    }*/
 
     @Operation(
             summary = "Atualiza o status do Administrador",

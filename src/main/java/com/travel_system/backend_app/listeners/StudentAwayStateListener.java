@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.listeners;
 
 import com.travel_system.backend_app.events.StudentAwayStateCheckEvent;
+import com.travel_system.backend_app.infrastructure.TenantFilterAspect;
 import com.travel_system.backend_app.service.LocationService;
 import com.travel_system.backend_app.service.RedisTrackingService;
 import org.slf4j.Logger;
@@ -14,12 +15,14 @@ public class StudentAwayStateListener {
 
     private final LocationService locationService;
     private final RedisTrackingService redisTrackingService;
+    private final TenantFilterAspect tenantFilterAspect;
 
     private final Logger logger = LoggerFactory.getLogger(StudentAwayStateListener.class);
 
-    public StudentAwayStateListener(LocationService locationService, RedisTrackingService redisTrackingService) {
+    public StudentAwayStateListener(LocationService locationService, RedisTrackingService redisTrackingService, TenantFilterAspect tenantFilterAspect) {
         this.locationService = locationService;
         this.redisTrackingService = redisTrackingService;
+        this.tenantFilterAspect = tenantFilterAspect;
     }
 
     @Async("studentAwayTaskExecutor")
@@ -35,6 +38,9 @@ public class StudentAwayStateListener {
             return;
         }
         try {
+            // aplica o filtro de customer manualmente antes de acessar o banco
+            tenantFilterAspect.applyFilter();
+
             locationService.processStudentAwayState(event);
 
         } catch (Exception e) {

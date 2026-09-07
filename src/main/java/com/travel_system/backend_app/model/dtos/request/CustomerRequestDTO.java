@@ -1,7 +1,6 @@
 package com.travel_system.backend_app.model.dtos.request;
 
 import com.travel_system.backend_app.model.City;
-import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.enums.ClientSector;
 
 import javax.validation.constraints.Email;
@@ -18,8 +17,6 @@ public record CustomerRequestDTO(
         String cnpj,
         @NotNull(message = "cityId is required")
         UUID cityId,
-        Set<UUID> userIds,
         @NotNull(message = "clientSector is required")
-        ClientSector clientSector,
-        String profilePicture) {
+        ClientSector clientSector) {
 }

@@ -6,16 +6,18 @@ import com.travel_system.backend_app.repository.TravelRepository;
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Set;
 import java.util.UUID;
+
+import static com.travel_system.backend_app.config.constants.TravelConstants.TRIP_INACTIVITY_TIMEOUT;
 
 @Service
 public class SystemMetricsService {
@@ -24,18 +26,22 @@ public class SystemMetricsService {
     private final ThreadPoolTaskExecutor studentAwayStateExecutor;
 
     private final RedisTrackingService redisTrackingService;
+    private final TravelService travelService;
+
     private final TravelRepository travelRepository;
+
     private final CircuitBreaker gpsCircuitBreaker;
 
     private static final Logger logger = LoggerFactory.getLogger(SystemMetricsService.class);
 
     public SystemMetricsService(@Qualifier("vehicleGpsTaskExecutor") ThreadPoolTaskExecutor vehicleGpsExecutor,
                                 @Qualifier("notificationTaskExecutor") ThreadPoolTaskExecutor notificationExecutor,
-                                @Qualifier("studentAwayTaskExecutor") ThreadPoolTaskExecutor studentAwayStateExecutor, RedisTrackingService redisTrackingService, TravelRepository travelRepository, CircuitBreakerRegistry registry) {
+                                @Qualifier("studentAwayTaskExecutor") ThreadPoolTaskExecutor studentAwayStateExecutor, RedisTrackingService redisTrackingService, TravelService travelService, TravelRepository travelRepository, CircuitBreakerRegistry registry) {
         this.notificationExecutor = notificationExecutor;
         this.vehicleGpsExecutor = vehicleGpsExecutor;
         this.studentAwayStateExecutor = studentAwayStateExecutor;
         this.redisTrackingService = redisTrackingService;
+        this.travelService = travelService;
         this.travelRepository = travelRepository;
         this.gpsCircuitBreaker = registry.circuitBreaker("gpsIngestor");
     }
@@ -161,11 +167,8 @@ public class SystemMetricsService {
     // encerra a viagem e deleta as telemetrias de cache dessa viagem em específico no redis
     @Transactional
     private void handleTravelTimeout(UUID travelId) {
-        Travel travel = travelRepository.findById(travelId)
-                .orElseThrow(() -> new EntityNotFoundException("Viagem não encontrada: " + travelId));
-
-        travel.setTravelStatus(TravelStatus.FINISH);
-        travelRepository.save(travel);
+        // chama service para finalizar a viagem
+        travelService.endTravel(travelId);
 
         redisTrackingService.removeUnactiveTravel(travelId);
         redisTrackingService.clearTravelLocationCache(travelId);
@@ -173,12 +176,9 @@ public class SystemMetricsService {
         logger.info("[AUTO-HEALING] Viagem {} encerrada por inatividade.", travelId);
     }
 
-    // verifica se o último ping foi há mais de 8 minutos (expired)
+    // verifica se o último ping foi há mais tempo do que o TRIP_INACTIVITY_TIMEOUT configurado
     private boolean isExpired(Long lastPing) {
-        // 8 minutos em milissegundos
-        long expirationMillis = 8 * 60 * 1000;
-
-        return (System.currentTimeMillis() - lastPing) >= expirationMillis;
+        return lastPing >= TRIP_INACTIVITY_TIMEOUT;
     }
 
     private int percentCalc(int original, int percent) {

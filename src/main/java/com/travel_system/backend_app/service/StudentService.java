@@ -1,200 +1,180 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.interfaces.mappers.StudentMapper;
+import com.travel_system.backend_app.infrastructure.TenantContext;
+import com.travel_system.backend_app.interfaces.mappers.StudentRequestMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.StudentResponseMapper;
 import com.travel_system.backend_app.model.Customer;
 import com.travel_system.backend_app.model.Permissions;
-import com.travel_system.backend_app.model.StudentTravel;
+import com.travel_system.backend_app.model.UserAccount;
 import com.travel_system.backend_app.model.dtos.request.StudentUpdateDTO;
-import com.travel_system.backend_app.model.dtos.request.UpdateEntityStatusDTO;
+import com.travel_system.backend_app.model.enums.Shift;
+import com.travel_system.backend_app.model.enums.UserAccountType;
 import com.travel_system.backend_app.repository.CustomerRepository;
 import com.travel_system.backend_app.repository.PermissionsRepository;
 import com.travel_system.backend_app.repository.StudentRepository;
-import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.model.Student;
 import com.travel_system.backend_app.model.dtos.request.StudentRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.StudentResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
-import org.checkerframework.checker.units.qual.Current;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class StudentService {
-    private final StudentRepository repository;
-    private final PasswordEncoder passwordEncoder;
+    private final StudentRepository studentRepository;
     private final PermissionsRepository permissionsRepository;
-    private final CustomerRepository customerRepository;
-    private final StudentMapper studentMapper;
-    private final CurrentUserService currentUserService;
+    private final UserAccountRepository userAccountRepository;
 
-    public StudentService(StudentRepository repository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository, CustomerRepository customerRepository, StudentMapper studentMapper, CurrentUserService currentUserService) {
-        this.repository = repository;
-        this.passwordEncoder = passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
+
+
+    private final StudentResponseMapper studentResponseMapper;
+    private final StudentRequestMapper studentRequestMapper;
+
+    public StudentService(StudentRepository studentRepository, PermissionsRepository permissionsRepository, UserAccountRepository userAccountRepository, PasswordEncoder passwordEncoder, StudentResponseMapper studentResponseMapper, StudentRequestMapper studentRequestMapper) {
+        this.studentRepository = studentRepository;
         this.permissionsRepository = permissionsRepository;
-        this.customerRepository = customerRepository;
-        this.studentMapper = studentMapper;
-        this.currentUserService = currentUserService;
+        this.userAccountRepository = userAccountRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.studentResponseMapper = studentResponseMapper;
+        this.studentRequestMapper = studentRequestMapper;
     }
 
+    @Transactional(readOnly = true)
     public Page<StudentResponseDTO> getAllStudents() {
         Pageable pageable = PageRequest.of(0, 10);
 
-        Page<Student> getAllStudents = repository.findAll(pageable);
+        Page<Student> getAllStudents = studentRepository.findAll(pageable);
 
-        return getAllStudents.map(this::studentConverted);
+        return getAllStudents.map(studentResponseMapper::toDTO);
     }
 
+    @Transactional(readOnly = true)
     public Page<StudentResponseDTO> getStudentsByStatus(GeneralStatus status) {
         Pageable pageable = PageRequest.of(0, 10);
 
         if (status == null) status = GeneralStatus.ACTIVE;
 
-        Page<Student> students = repository.findAllByStatus(status, pageable);
+        Page<Student> students = studentRepository.findAllByStatus(status, pageable);
 
-        return students.map(this::studentConverted);
+        return students.map(studentResponseMapper::toDTO);
     }
 
     @Transactional
     public StudentResponseDTO createStudent(StudentRequestDTO requestDTO) {
         verifyFieldsIsNull(requestDTO);
 
-        Optional<Student> email = repository.findByEmail(requestDTO.email());
-        Optional<Student> telephone = repository.findByTelephone(requestDTO.telephone());
+        if (userAccountRepository.existsByEmail(requestDTO.email())) {
+            throw new DuplicateResourceException("O email " + requestDTO.email() + " já existe");
+        }
 
-        if (email.isPresent()) throw new DuplicateResourceException("O email " + requestDTO.email() + " já existe");
-        if (telephone.isPresent()) throw new DuplicateResourceException("O telefone " + requestDTO.telephone() + " já existe");
+        if (studentRepository.existsByTelephone(requestDTO.telephone())) {
+            throw new DuplicateResourceException("O telefone " + requestDTO.telephone() + " já existe");
+        }
 
-        final String PERM = "ROLE_USER";
-        Permissions userPerm = permissionsRepository.findByDescription(PERM)
-                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + PERM + " não encontrada."));
+/*        final String PERM = "ROLE_USER";
+        Permissions studentPermission = permissionsRepository.findByDescription(PERM)
+                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + PERM + " não encontrada."));*/
 
-        Customer customer = customerRepository.findById(requestDTO.customerId())
-                .orElseThrow(() -> new EntityNotFoundException("Customer: " + requestDTO.customerId() + " não encontrado"));
+        UserAccount userAccount = new UserAccount();
+        userAccount.setPassword(passwordEncoder.encode(requestDTO.password()));
+        userAccount.setEmail(requestDTO.email());
+        userAccount.setPermissions(List.of());
+        userAccount.setUserAccountType(UserAccountType.UNASSIGNED);
 
-        Student newStudent = studentMapper(requestDTO);
+        UserAccount savedAccount = userAccountRepository.save(userAccount);
 
-        newStudent.setPermissions(List.of(userPerm));
-        newStudent.setCreatedAt(LocalDateTime.now());
-        newStudent.setStatus(GeneralStatus.ACTIVE);
-        newStudent.setCustomerId(customer.getId());
+        Student student = studentRequestMapper.toEntity(requestDTO);
 
-        Student savedStudent = repository.save(newStudent);
-        return studentConverted(savedStudent);
+        student.setUserAccount(savedAccount);
+
+        // vínculo com o(s) período(s)
+        if (!requestDTO.studentShift().isEmpty()) {
+            student.setStudentShift(requestDTO.studentShift());
+        }
+
+        Student savedStudent = studentRepository.save(student);
+
+        return studentResponseMapper.toDTO(savedStudent);
     }
 
     @Transactional
     public StudentResponseDTO updateCurrentStudent(String authenticatedUserEmail, StudentUpdateDTO studentUpdateDTO) {
-        Student studentEntity = repository.findByEmail(authenticatedUserEmail)
+        Student studentEntity = studentRepository.findByEmail(authenticatedUserEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + authenticatedUserEmail));
 
-        if (studentEntity.getStatus().equals(GeneralStatus.INACTIVE)) {
+        if (studentEntity.getStatus() == GeneralStatus.INACTIVE) {
           throw new InactiveAccountModificationException("Não é possível modificar dados de uma conta inativa: " + authenticatedUserEmail);
         }
 
+        UserAccount userAccount = studentEntity.getUserAccount();
+
         // verifica se email já existe
-        if (studentUpdateDTO.email() != null && !studentUpdateDTO.email().equals(studentEntity.getEmail())) {
-            boolean isEmailExists = repository.findByEmail(studentUpdateDTO.email()).isPresent();
-
-            if (isEmailExists) throw new DuplicateResourceException("Email já em uso por outro usuário.");
-
-            studentEntity.setEmail(studentUpdateDTO.email());
+        if (studentUpdateDTO.email() != null && !studentUpdateDTO.email().equals(userAccount.getEmail())) {
+            if (userAccountRepository.existsByEmail(studentUpdateDTO.email())) {
+                throw new DuplicateResourceException("Email já em uso por outro usuário.");
+            }
         }
 
         // verifica se telefone já existe
         if (studentUpdateDTO.telephone() != null && !studentUpdateDTO.telephone().equals(studentEntity.getTelephone())) {
-            boolean isTelephoneExists = repository.findByTelephone(studentUpdateDTO.telephone()).isPresent();
-
-            if (isTelephoneExists) throw new DuplicateResourceException("Telefone já em uso por outro usuário.");
-
-            studentEntity.setTelephone(studentUpdateDTO.telephone());
+            if (studentRepository.existsByTelephone(studentUpdateDTO.telephone())) {
+                throw new DuplicateResourceException("Telefone já em uso por outro usuário.");
+            }
         }
 
         // atualiza parcialmente sempre ignorando a senha
-        studentMapper.studentUpdateFromDTO(studentUpdateDTO, studentEntity);
+        studentRequestMapper.studentUpdateFromDTO(studentUpdateDTO, studentEntity);
 
         // senha atualiza manualmente por conta do encrypt
         if (studentUpdateDTO.password() != null && !studentUpdateDTO.password().isBlank()) {
-            studentEntity.setPassword(passwordEncoder.encode(studentUpdateDTO.password()));
+            userAccount.setPassword(passwordEncoder.encode(studentUpdateDTO.password()));
         }
         
-        Student savedStudent = repository.save(studentEntity);
-        return studentConverted(savedStudent);
+        Student savedStudent = studentRepository.save(studentEntity);
+
+        return studentResponseMapper.toDTO(savedStudent);
     }
 
+    @Transactional(readOnly = true)
     public StudentResponseDTO getCurrentStudent(String email) {
-        Student student = repository.findByEmail(email)
+        Student student = studentRepository.findByEmail(email)
                 .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrato: " + email));
 
-        return studentConverted(student);
+        return studentResponseMapper.toDTO(student);
     }
 
     @Transactional
     public void updateStudentStatus(UUID studentId, GeneralStatus newStatus) {
-        Student student = repository.findById(studentId)
+        Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new EntityNotFoundException("Estudante não encontrado, " + studentId));
 
-        if (student.getStatus().equals(newStatus)) {
-            throw new DuplicateResourceException("Estudante " + studentId + " já com o status " + newStatus);
+        if (student.getStatus() == newStatus) {
+            throw new DomainValidationException("Estudante " + studentId + " já com o status " + newStatus);
         }
 
         student.setStatus(newStatus);
-        student.setUpdatedAt(LocalDateTime.now());
 
-        repository.save(student);
-    }
-
-    // MÉTODOS AUXILIARES
-    // MÉTODOS AUXILIARES
-    // MÉTODOS AUXILIARES
-
-    private Student studentMapper(StudentRequestDTO requestDTO) {
-        Student newStudent = new Student();
-
-        newStudent.setEmail(requestDTO.email());
-        newStudent.setPassword(passwordEncoder.encode(requestDTO.password()));
-        newStudent.setName(requestDTO.name());
-        newStudent.setLastName(requestDTO.lastName());
-        newStudent.setTelephone(requestDTO.telephone());
-        newStudent.setInstitutionType(requestDTO.institutionType());
-        newStudent.setCourse(requestDTO.course());
-
-        return newStudent;
-    }
-
-    private StudentResponseDTO studentConverted(Student student) {
-        return new StudentResponseDTO(
-                student.getId(),
-                student.getName(),
-                student.getLastName(),
-                student.getEmail(),
-                student.getTelephone(),
-                student.getStatus(),
-                currentUserService.getPublicUrl(student.getProfilePicture()),
-                student.getCreatedAt(),
-                student.getInstitutionType(),
-                student.getCourse(),
-                student.getCustomerId()
-        );
+        studentRepository.save(student);
     }
 
     private void verifyFieldsIsNull(StudentRequestDTO dto) {
         if (dto.email() == null || dto.password() == null ||
-                dto.name() == null || dto.telephone() == null || dto.institutionType() == null || dto.course() == null
-        || dto.customerId() == null) {
-            throw new EmptyMandatoryFieldsFound("Você deve preencher todos os campos requeridos");
+                dto.name() == null || dto.telephone() == null || dto.institutionType() == null || dto.course() == null) {
+            throw new EmptyMandatoryFieldsFoundException("Você deve preencher todos os campos requeridos");
         }
     }
 

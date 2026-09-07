@@ -1,17 +1,17 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.config.TenantConfig;
 import com.travel_system.backend_app.config.TokenConfig;
-import com.travel_system.backend_app.controller.RabbitMQAuthController;
 import com.travel_system.backend_app.infrastructure.TenantContext;
+import com.travel_system.backend_app.model.UserAccount;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.model.enums.UserAccountType;
+import com.travel_system.backend_app.repository.DriverRepository;
+import com.travel_system.backend_app.repository.StudentRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.web.bind.annotation.RequestParam;
 
 import java.util.UUID;
 import java.util.regex.Matcher;
@@ -21,7 +21,10 @@ import java.util.regex.Pattern;
 public class RabbitMQAuthService {
     private final TokenConfig tokenConfig;
     private final TravelService travelService;
-    private final UserRepository userRepository;
+
+    private final StudentRepository studentRepository;
+    private final DriverRepository driverRepository;
+    private final UserAccountRepository userAccountRepository;
 
     @Value("${rabbitmq_user}")
     private String rabbitmq_user;
@@ -30,10 +33,12 @@ public class RabbitMQAuthService {
 
     private final Logger log = LoggerFactory.getLogger(RabbitMQAuthService.class);
 
-    public RabbitMQAuthService(TokenConfig tokenConfig, TravelService travelService, UserRepository userRepository) {
+    public RabbitMQAuthService(TokenConfig tokenConfig, TravelService travelService, StudentRepository studentRepository, DriverRepository driverRepository, UserAccountRepository userAccountRepository) {
         this.tokenConfig = tokenConfig;
         this.travelService = travelService;
-        this.userRepository = userRepository;
+        this.studentRepository = studentRepository;
+        this.driverRepository = driverRepository;
+        this.userAccountRepository = userAccountRepository;
     }
 
     // rabbitMq authorization - valida token e libera acesso
@@ -52,7 +57,14 @@ public class RabbitMQAuthService {
             }
 
             String subjectFromToken = tokenConfig.getSubjectFromToken(password);
-            UUID id = UUID.fromString(username);
+
+            UUID idFromToken;
+            try {
+                idFromToken = UUID.fromString(username);
+            } catch (IllegalArgumentException e) {
+                log.warn("[authenticateMessaging] formato de UUID inválido");
+                return false;
+            }
 
             // recupera o CustomerID do token e injeta na Thread atual
             UUID customerIdFromToken = tokenConfig.getCustomerIdFromToken(password);
@@ -60,11 +72,25 @@ public class RabbitMQAuthService {
                 TenantContext.setCurrentTenant(customerIdFromToken);
             }
 
-
-            boolean validateUser = userRepository.existsByEmailAndIdAndStatus(subjectFromToken, id, GeneralStatus.ACTIVE);
-
-            if (!validateUser) {
+            UserAccount user = userAccountRepository.findUserByEmail(subjectFromToken);
+            if (user == null) {
                 log.warn("[authenticateMessaging] ID divergente do Token ou usuário inativo.");
+                return false;
+            }
+
+            UserAccountType userAccountType = user.getUserAccountType();
+
+            // verifica se é um STUDENT ou DRIVER
+            if (userAccountType != UserAccountType.STUDENT && userAccountType != UserAccountType.DRIVER) {
+                log.warn("[authenticateMessaging] Tipo de usuário não permitido para esta conexão: {}", userAccountType);
+                return false;
+            }
+
+            // verifica se o estudante ou motorista existe e está ativo no sistema
+            boolean isValidUser = isValidAndActiveUser(idFromToken, userAccountType);
+
+            if (!isValidUser) {
+                log.warn("[authenticateMessaging] Usuário não encontrado, ID divergente ou status inativo.");
                 return false;
             }
 
@@ -153,4 +179,23 @@ public class RabbitMQAuthService {
                     "([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})" +
                     "[/.]location$"
     );
+
+    private boolean isValidAndActiveUser(UUID idFromToken, UserAccountType userAccountType) {
+        if (userAccountType == UserAccountType.STUDENT) {
+            return studentRepository.findById(idFromToken)
+                    .map(student -> student.getStatus() == GeneralStatus.ACTIVE).orElse(false);
+
+        } else if (userAccountType == UserAccountType.DRIVER) {
+            return driverRepository.findById(idFromToken)
+                    .map(driver -> driver.getStatus() == GeneralStatus.ACTIVE).orElse(false);
+        }
+        return false;
+    }
 }
+
+/*
+* GUIDE
+* Fluxo de auth com o rabbitmq: válida o próprio sistema (back) tentando autenticação ou user externo via JWT
+*
+*
+* */

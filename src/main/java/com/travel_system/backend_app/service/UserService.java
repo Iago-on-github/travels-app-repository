@@ -1,22 +1,18 @@
 package com.travel_system.backend_app.service;
 
-import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
-import com.travel_system.backend_app.model.UserModel;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.model.UserAccount;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import com.travel_system.backend_app.utils.CustomUserDetails;
-import jakarta.persistence.EntityNotFoundException;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class UserService implements UserDetailsService {
-    private final UserRepository repository;
+    private final UserAccountRepository repository;
 
-    public UserService(UserRepository repository) {
+    public UserService(UserAccountRepository repository) {
         this.repository = repository;
     }
 
@@ -27,13 +23,7 @@ public class UserService implements UserDetailsService {
             throw new UsernameNotFoundException("Email não informado.");
         }
 
-        /*UserModel user = repository.findUserByEmail(username);
-
-        if (user == null) {
-            throw new UsernameNotFoundException("Usuário não encontrado: " + username);
-        }*/
-
-        UserModel user = repository.findByEmailForAuthentication(username)
+        UserAccount user = repository.findByEmailForAuthentication(username)
                 .orElseThrow(() -> new UsernameNotFoundException("Usuário não encontrado com o e-mail: " + username));
 
         return new CustomUserDetails(user);

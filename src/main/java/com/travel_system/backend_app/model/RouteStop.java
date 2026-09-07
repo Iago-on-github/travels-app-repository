@@ -5,12 +5,14 @@ import com.travel_system.backend_app.model.enums.GeneralStatus;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 import java.util.*;
 
 @Entity
 @Table(name = "route_stop")
+@EntityListeners(AuditingEntityListener.class)
 public class RouteStop extends BaseTenantEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -26,7 +28,7 @@ public class RouteStop extends BaseTenantEntity {
     @OneToMany(mappedBy = "routeStop")
     private List<StudentTravelRouteStop> studentTravelRouteStops = new ArrayList<>();
     @Enumerated(EnumType.STRING)
-    private GeneralStatus status;
+    private GeneralStatus status = GeneralStatus.ACTIVE;
     @CreatedDate
     private Instant createdAt;
     @LastModifiedDate

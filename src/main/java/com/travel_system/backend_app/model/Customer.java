@@ -4,12 +4,14 @@ import com.travel_system.backend_app.model.enums.ClientSector;
 import jakarta.persistence.*;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.Instant;
 import java.util.*;
 
 @Entity
 @Table(name = "customer_table")
+@EntityListeners(AuditingEntityListener.class)
 public class Customer {
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -18,7 +20,7 @@ public class Customer {
     @Column(unique = true)
     private String slug;
     private String cnpj;
-    private boolean active;
+    private boolean active = true;
     @ManyToOne
     private City city;
     @Enumerated(EnumType.STRING)

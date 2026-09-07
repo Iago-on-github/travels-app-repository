@@ -1,15 +1,43 @@
 package com.travel_system.backend_app.model;
 
+import com.travel_system.backend_app.infrastructure.BaseTenantEntity;
 import com.travel_system.backend_app.model.enums.InstitutionType;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
+import com.travel_system.backend_app.model.enums.Shift;
 import jakarta.persistence.*;
+import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.annotation.LastModifiedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
+import org.springframework.format.annotation.DateTimeFormat;
 
+import java.time.Instant;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.*;
 
 @Entity
-@Table(name = "STUDENT_TABLE")
-public class Student extends UserModel {
+@Table(name = "student_table")
+@EntityListeners(AuditingEntityListener.class)
+public class Student extends BaseTenantEntity {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+    @OneToOne(optional = false)
+    @JoinColumn(name = "user_account_id", nullable = false, unique = true)
+    private UserAccount userAccount;
+    private String name;
+    private String lastName;
+    private String telephone;
+    private String profilePicture;
+    @DateTimeFormat(pattern = "dd/MM/yyyy")
+    private LocalDate birthdate;
+    @ElementCollection
+    @CollectionTable(name = "student_shifts", joinColumns = @JoinColumn(name = "student_id"))
+    @Enumerated(EnumType.STRING)
+    private Set<Shift> studentShift = new HashSet<>();
+    @Enumerated(EnumType.STRING)
+    private GeneralStatus status = GeneralStatus.ACTIVE;
     @Enumerated(EnumType.STRING)
     private InstitutionType institutionType;
     private String course;
@@ -17,14 +45,99 @@ public class Student extends UserModel {
     private Set<StudentTravel> studentTravels = new HashSet<>();
     @OneToMany(mappedBy = "student")
     private List<StudentRouteStopAssignment> studentRouteStopAssignments = new ArrayList<>();
+    @CreatedDate
+    private Instant createdAt;
+    @LastModifiedDate
+    private Instant updatedAt;
 
     public Student() {
     }
 
-    public Student(UUID id, String email, String password, String name, String lastName, String telephone, String profilePicture, GeneralStatus status, LocalDateTime createdAt, LocalDateTime updatedAt, Customer customer, InstitutionType institutionType, String course) {
-        super(id, email, password, name, lastName, telephone, profilePicture, status, createdAt, updatedAt, customer);
+    public Student(UUID id, UserAccount userAccount, String name, String lastName, String telephone, String profilePicture, LocalDate birthdate, GeneralStatus status, InstitutionType institutionType, String course, Instant updatedAt, Instant createdAt) {
+        this.id = id;
+        this.userAccount = userAccount;
+        this.name = name;
+        this.lastName = lastName;
+        this.telephone = telephone;
+        this.profilePicture = profilePicture;
+        this.birthdate = birthdate;
+        this.status = status;
         this.institutionType = institutionType;
         this.course = course;
+        this.updatedAt = updatedAt;
+        this.createdAt = createdAt;
+    }
+
+    public UUID getId() {
+        return id;
+    }
+
+    public void setId(UUID id) {
+        this.id = id;
+    }
+
+    public UserAccount getUserAccount() {
+        return userAccount;
+    }
+
+    public void setUserAccount(UserAccount userAccount) {
+        this.userAccount = userAccount;
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getTelephone() {
+        return telephone;
+    }
+
+    public void setTelephone(String telephone) {
+        this.telephone = telephone;
+    }
+
+    public String getProfilePicture() {
+        return profilePicture;
+    }
+
+    public void setProfilePicture(String profilePicture) {
+        this.profilePicture = profilePicture;
+    }
+
+    public LocalDate getBirthdate() {
+        return birthdate;
+    }
+
+    public void setBirthdate(LocalDate birthdate) {
+        this.birthdate = birthdate;
+    }
+
+    public Set<Shift> getStudentShift() {
+        return studentShift;
+    }
+
+    public void setStudentShift(Set<Shift> studentShift) {
+        this.studentShift = studentShift;
+    }
+
+    public GeneralStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(GeneralStatus status) {
+        this.status = status;
     }
 
     public InstitutionType getInstitutionType() {
@@ -57,5 +170,21 @@ public class Student extends UserModel {
 
     public void setStudentRouteStopAssignments(List<StudentRouteStopAssignment> studentRouteStopAssignments) {
         this.studentRouteStopAssignments = studentRouteStopAssignments;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(Instant createdAt) {
+        this.createdAt = createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(Instant updatedAt) {
+        this.updatedAt = updatedAt;
     }
 }

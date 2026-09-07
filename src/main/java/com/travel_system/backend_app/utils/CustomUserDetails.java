@@ -1,6 +1,6 @@
 package com.travel_system.backend_app.utils;
 
-import com.travel_system.backend_app.model.UserModel;
+import com.travel_system.backend_app.model.UserAccount;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -11,9 +11,9 @@ public class CustomUserDetails implements UserDetails {
 
     // custom para adaptar o login conforme as classes filhos de UserModel
 
-    private final UserModel user;
+    private final UserAccount user;
 
-    public CustomUserDetails(UserModel user) {
+    public CustomUserDetails(UserAccount user) {
         this.user = user;
     }
 

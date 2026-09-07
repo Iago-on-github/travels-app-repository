@@ -1,16 +1,15 @@
 package com.travel_system.backend_app.service;
 
+import com.google.firebase.auth.multitenancy.Tenant;
 import com.mapbox.geojson.Point;
 import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.infrastructure.TenantContext;
 import com.travel_system.backend_app.interfaces.mappers.RouteStopRequestMapper;
-import com.travel_system.backend_app.interfaces.mappers.RouteStopResponseMapper;
-import com.travel_system.backend_app.interfaces.mappers.StandardRouteRequestMapper;
-import com.travel_system.backend_app.interfaces.mappers.StandardRouteResponseMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.RouteStopResponseMapper;
 import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.request.*;
 import com.travel_system.backend_app.model.dtos.response.RouteStopResponseDTO;
-import com.travel_system.backend_app.model.dtos.response.StandardRouteResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
@@ -19,34 +18,38 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
-import java.util.function.Function;
-import java.util.stream.Collectors;
 
 @Service
 public class RouteStopService {
 
-    private final UserRepository userRepository;
+    private final UserAccountRepository userAccountRepository;
     private final RouteStopRepository routeStopRepository;
     private final StudentRepository studentRepository;
     private final StudentRouteStopAssignmentRepository studentRouteStopAssignmentRepository;
+    private final AdministratorRepository administratorRepository;
 
     private final MapboxAPIService mapboxAPIService;
+    private final UserProfileResolverService userProfileResolverService;
 
     private final RouteStopResponseMapper routeStopResponseMapper;
     private final RouteStopRequestMapper routeStopRequestMapper;
 
-    public RouteStopService(UserRepository userRepository, RouteStopRepository routeStopRepository, StudentRepository studentRepository, StudentRouteStopAssignmentRepository studentRouteStopAssignmentRepository, MapboxAPIService mapboxAPIService, RouteStopResponseMapper routeStopResponseMapper, RouteStopRequestMapper routeStopRequestMapper) {
-        this.userRepository = userRepository;
+    public RouteStopService(UserAccountRepository userAccountRepository, RouteStopRepository routeStopRepository, StudentRepository studentRepository, StudentRouteStopAssignmentRepository studentRouteStopAssignmentRepository, AdministratorRepository administratorRepository, MapboxAPIService mapboxAPIService, UserProfileResolverService userProfileResolverService, RouteStopResponseMapper routeStopResponseMapper, RouteStopRequestMapper routeStopRequestMapper) {
+        this.userAccountRepository = userAccountRepository;
         this.routeStopRepository = routeStopRepository;
         this.studentRepository = studentRepository;
         this.studentRouteStopAssignmentRepository = studentRouteStopAssignmentRepository;
+        this.administratorRepository = administratorRepository;
         this.mapboxAPIService = mapboxAPIService;
+        this.userProfileResolverService = userProfileResolverService;
         this.routeStopResponseMapper = routeStopResponseMapper;
         this.routeStopRequestMapper = routeStopRequestMapper;
     }
 
     @Transactional(readOnly = true)
-    public List<RouteStopResponseDTO> getRouteStopsByCustomer(UUID customerId) {
+    public List<RouteStopResponseDTO> getRouteStopsByCustomer() {
+        UUID customerId = TenantContext.getCurrentTenant(); // pega o atual customer do Administrator
+
         List<RouteStop> routeStopsByCustomerId = routeStopRepository.findRouteStopsByCustomerId(customerId);
 
         return routeStopsByCustomerId.stream().map(routeStopResponseMapper::toDTO).toList();
@@ -70,7 +73,7 @@ public class RouteStopService {
 
     @Transactional
     public RouteStopResponseDTO createRouteStop(String authenticatedEmail, RouteStopRequestDTO routeStopRequestDTO) {
-        UserModel authenticatedUser = userRepository.findUserByEmail(authenticatedEmail);
+        UserAccount authenticatedUser = userAccountRepository.findUserByEmail(authenticatedEmail);
 
         if (authenticatedUser == null) throw new EntityNotFoundException("Usuário com o email " + authenticatedEmail + " não encontrado");
 
@@ -78,20 +81,23 @@ public class RouteStopService {
         checkValidAdmin(authenticatedUser);
         checkAdminPrivileges(authenticatedUser);
 
+        // obtém o customerID do contexto atual e valida existência
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null ) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido");
+        }
+
+        // valida duplicidade do nome do RouteStop no customer
+        if (routeStopRepository.existsByNameAndCustomerId(routeStopRequestDTO.name(), customerId)) {
+            throw new DuplicateResourceException("Já existe um RouteStop com esse nome: " + routeStopRequestDTO.name());
+        }
+
+        // mapeia o salva o routestop
         RouteStop routeStop = routeStopRequestMapper.toEntity(routeStopRequestDTO);// mapper DTO converte para entidade
-
-        routeStop.setCustomerId(authenticatedUser.getCustomerId()); // mesmo customer do user autenticado
-
-        // valida mesmo Customer
-        validateSameCustomer(authenticatedUser.getCustomerId(), routeStop.getCustomerId());
-
-        // duplicidade de "name"
-        boolean isAlreadyExistsRouteStopName = routeStopRepository.existsByNameAndCustomerId(routeStopRequestDTO.name(), authenticatedUser.getCustomerId());
-
-        if (isAlreadyExistsRouteStopName) throw new DuplicateResourceException("Já existe um RouteStop com esse nome: " + routeStopRequestDTO.name());
-
-        routeStop.setCreatedAt(Instant.now());
         routeStop.setStatus(GeneralStatus.ACTIVE);
+
+        RouteStop savedRouteStop = routeStopRepository.save(routeStop);
+        System.out.println("customerId salvo: " + savedRouteStop.getCustomerId());
 
         // opcional: adicionar estudantes enquanto criar a rota
         if (routeStopRequestDTO.studentIds() != null && !routeStopRequestDTO.studentIds().isEmpty()) {
@@ -99,15 +105,20 @@ public class RouteStopService {
 
             List<Student> students = studentRepository.findAllById(studentIds);
 
+            if (students.size() != studentIds.size()) {
+                throw new EntityNotFoundException("Um ou mais estudantes não foram encontrados");
+            }
+
             for (Student student : students) {
-                if (students.size() != studentIds.size()) {
-                    throw new EntityNotFoundException("Um ou mais estudantes não foram encontrados");
+
+                if (student.getStatus().equals(GeneralStatus.INACTIVE)) {
+                    throw new InactiveAccountException("Estudante Inativo no sistema: " + student.getId());
                 }
-                if (student.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountException("Estudante Inativo no sistema: " + student.getId());
 
                 // devem ser do mesmo customer
-                validateSameCustomer(authenticatedUser.getCustomerId(), student.getCustomerId());
+                validateSameCustomer(customerId, student.getCustomerId());
 
+                // cria a mapeia a entidade de associação entre RouteStop e Student
                 StudentRouteStopAssignment studentRouteStopAssignment = new StudentRouteStopAssignment();
                 studentRouteStopAssignment.setStudent(student);
                 studentRouteStopAssignment.setRouteStop(routeStop);
@@ -118,43 +129,47 @@ public class RouteStopService {
             }
         }
 
-        RouteStop savedRouteStop = routeStopRepository.save(routeStop);
-
         return routeStopResponseMapper.toDTO(savedRouteStop);
     }
 
     @Transactional
     public RouteStopResponseDTO updateRouteStop(String authenticatedEmail, UUID routeStopId, RouteStopUpdateDTO routeStopUpdateDTO) {
-        UserModel authenticatedUser = userRepository.findUserByEmail(authenticatedEmail);
+        UserAccount authenticatedUser = userAccountRepository.findUserByEmail(authenticatedEmail);
 
         if (authenticatedUser == null) throw new EntityNotFoundException("Usuário com o email " + authenticatedEmail + " não encontrado");
 
         RouteStop routeStop = routeStopRepository.findById(routeStopId)
                 .orElseThrow(() -> new EntityNotFoundException("RouteStop não encontrado: " + routeStopId));
 
-        // verifica se o user é válido (admin, platform_admin)
+        // verifica se o administrador é válido
         checkValidAdmin(authenticatedUser);
         checkAdminPrivileges(authenticatedUser);
 
+        // obtém o customerID do contexto atual e valida existência
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null ) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido");
+        }
+
         // valida mesmo Customer
-        validateSameCustomer(authenticatedUser.getCustomerId(), routeStop.getCustomerId());
+        validateSameCustomer(customerId, routeStop.getCustomerId());
 
-        // duplicidade de "name"
-        boolean isAlreadyExistsRouteStopName = routeStopRepository.existsByNameAndCustomerId(routeStopUpdateDTO.name(), authenticatedUser.getCustomerId());
+        // valida duplicidade do nome do RouteStop no customer
+        if (routeStopUpdateDTO.name() != null && !routeStopUpdateDTO.name().equals(routeStop.getName())) {
+            if (routeStopRepository.existsByNameAndCustomerIdAndIdNot(routeStopUpdateDTO.name(), customerId, routeStopId)) {
+                throw new DuplicateResourceException("Já existe um RouteStop com esse nome neste Customer: " + routeStopUpdateDTO.name());
+            }
+        }
 
-        if (isAlreadyExistsRouteStopName) throw new DuplicateResourceException("Já existe um RouteStop com esse nome: " + routeStopUpdateDTO.name());
-
-        boolean routeStopLatitude = routeStopUpdateDTO.latitude() != null;
-        boolean routeStopLongitude = routeStopUpdateDTO.longitude() != null;
+        boolean hasLatitude = routeStopUpdateDTO.latitude() != null;
+        boolean hasLongitude = routeStopUpdateDTO.longitude() != null;
 
         // verifica se informou ambas as coordenadas de origem
-        if (routeStopLatitude != routeStopLongitude) {
+        if (hasLatitude != hasLongitude) {
             throw new NoSuchCoordinates("As coordenadas de Latitude e Longitude da origem devem ser informadas juntas");
         }
 
-        routeStop.setUpdatedAt(Instant.now());
-
-        routeStopRequestMapper.routeStopUpdateDTO(routeStopUpdateDTO, routeStop);// mapper DTO converte para entidade
+        routeStopRequestMapper.routeStopUpdateDTO(routeStopUpdateDTO, routeStop); // mapper DTO converte para entidade
 
         RouteStop savedRouteStop = routeStopRepository.save(routeStop);
 
@@ -163,7 +178,7 @@ public class RouteStopService {
 
     @Transactional
     public void updateRouteStopStatus(UUID routeStopId, String authenticatedEmail, GeneralStatus status) {
-        UserModel authenticatedUser = userRepository.findUserByEmail(authenticatedEmail);
+        UserAccount authenticatedUser = userAccountRepository.findUserByEmail(authenticatedEmail);
 
         if (authenticatedUser == null) throw new EntityNotFoundException("Usuário com o email " + authenticatedEmail + " não encontrado");
 
@@ -174,10 +189,16 @@ public class RouteStopService {
         RouteStop routeStop = routeStopRepository.findById(routeStopId)
                 .orElseThrow(() -> new EntityNotFoundException("RouteStop não encontrado"));
 
-        validateSameCustomer(routeStop.getCustomerId(), authenticatedUser.getCustomerId());
+        // obtém o customerID do contexto atual e valida existência
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null ) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido");
+        }
+
+        validateSameCustomer(customerId, routeStop.getCustomerId());
 
         if (routeStop.getStatus() == status) {
-            throw new DuplicateResourceException("RouteStop já contém o status " + status);
+            throw new IllegalStateException("RouteStop já contém o status " + status);
         }
 
         routeStop.setStatus(status);
@@ -185,59 +206,33 @@ public class RouteStopService {
         routeStopRepository.save(routeStop);
     }
 
-
-    // MÉTODOS AUXILIARES
-    private List<Point> buildWaypoints(List<RouteStopAssignment> assignmentsOrderedBySequence) {
-        return assignmentsOrderedBySequence.stream().map(route -> {
-            RouteStop eachRouteStop = route.getRouteStop();
-
-            if (eachRouteStop.getLongitude() == null || eachRouteStop.getLatitude() == null) {
-                throw new DomainValidationException("O RouteStop " + eachRouteStop.getId() + " não possui coordenadas válidas");
-            }
-
-            return Point.fromLngLat(eachRouteStop.getLongitude(), eachRouteStop.getLatitude());
-        }).toList();
-    }
-
-    private RouteDetailsDTO calculateStandardRouteGeometry(Double originLongitude, Double originLatitude, Double destinationLongitude, Double destinationLatitude, List<Point> waypoints) {
-        if (originLongitude == null || originLatitude == null || destinationLongitude == null || destinationLatitude == null) {
-            throw new IllegalArgumentException("Coordenadas da rota padrão inválidas ou inexistentes");
-        }
-
-        RouteDetailsDTO routeDetailsDTO = mapboxAPIService.calculateStandardRoute(
-                originLongitude,
-                originLatitude,
-                destinationLongitude,
-                destinationLatitude,
-                waypoints);
-
-        System.out.println("routeDetailsDTO: " + routeDetailsDTO);
-
-        if (routeDetailsDTO == null || routeDetailsDTO.geometry() == null) {
-            throw new RecalculateEtaException("Não foi possível recalcular a geometria da rota padrão");
-        }
-
-        return routeDetailsDTO;
-    }
-
-    private void checkAdminPrivileges(UserModel authenticatedUser) {
-        boolean isAdmin = authenticatedUser.getRoles().stream()
-                .anyMatch(role -> role.equals("ROLE_ADMIN") || role.equals("ROLE_PLATFORM_ADMIN"));
+    private void checkAdminPrivileges(UserAccount authenticatedUser) {
+        boolean isAdmin = authenticatedUser.getPermissions().stream()
+                .anyMatch(permission -> permission.getDescription().equals("ROLE_ADMIN") ||
+                        permission.getDescription().equals("ROLE_PLATFORM_ADMIN"));
 
         if (!isAdmin) {
-            throw new NotAuthorizedException("Apenas Administradores e Administradores de Plataforma podem criar ou modificar rotas");
+            throw new NotAuthorizedException("Apenas Administradores e Administradores de Plataforma podem criar ou modificar rotas.");
         }
     }
 
-    private void checkValidAdmin(UserModel authenticatedUser) {
-        if (authenticatedUser.getCustomerId() == null) throw new DomainValidationException("O usuário autenticado não está associado a um Customer");
-        if (authenticatedUser.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Usuário não está ativo");
+    private void checkValidAdmin(UserAccount authenticatedUser) {
+        // realiza a validação p/ ver se o Filter do Spring Security conseguiu associar o Tenant (seja pelo JWT ou as act)
+        if (TenantContext.getCurrentTenant() == null) {
+            throw new DomainValidationException("O usuário autenticado não está associado a um Customer nesta requisição.");
+        }
+
+        Administrator admin = administratorRepository.findByEmail(authenticatedUser.getEmail())
+                .orElseThrow(() -> new EntityNotFoundException("Perfil de Administrador não encontrado para este usuário."));
+
+        if (admin.getStatus() == GeneralStatus.INACTIVE) {
+            throw new InactiveAccountModificationException("Usuário não está ativo.");
+        }
     }
 
     private void validateSameCustomer(UUID firstCustomerId, UUID secondCustomerId) {
-        if (firstCustomerId == null || secondCustomerId == null ||
-                !firstCustomerId.equals(secondCustomerId)) {
-            throw new CustomerMismatchException("Os recursos não pertencem ao mesmo Customer: " + "first: " + firstCustomerId + ", second: " + secondCustomerId);
+        if (firstCustomerId == null || secondCustomerId == null || !firstCustomerId.equals(secondCustomerId)) {
+            throw new CustomerMismatchException("Os recursos não pertencem ao mesmo Customer.");
         }
     }
 }

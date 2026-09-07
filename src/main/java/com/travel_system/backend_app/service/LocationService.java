@@ -18,10 +18,10 @@ import com.travel_system.backend_app.repository.GeoPositionRepository;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.*;
@@ -29,7 +29,6 @@ import java.util.concurrent.TimeUnit;
 
 import static com.travel_system.backend_app.config.constants.GlobalAppConstants.AUTO_DISCONNECT_DISTANCE_METERS;
 import static com.travel_system.backend_app.config.constants.GlobalAppConstants.AUTO_DISCONNECT_TIME;
-
 
 @Service
 public class LocationService {

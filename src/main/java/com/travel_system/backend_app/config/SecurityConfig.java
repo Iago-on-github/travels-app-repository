@@ -1,9 +1,14 @@
 package com.travel_system.backend_app.config;
 
+import com.travel_system.backend_app.repository.CustomerRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import com.travel_system.backend_app.security.JwtAuthenticationFilter;
+import com.travel_system.backend_app.service.CurrentUserService;
+import com.travel_system.backend_app.service.UserProfileResolverService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -37,8 +42,8 @@ public class SecurityConfig {
     final String ROLE_USER = "USER";
 
     @Bean
-    public JwtAuthenticationFilter jwtAuthenticationFilter(TokenConfig tokenConfig) {
-        return new JwtAuthenticationFilter(tokenConfig);
+    public JwtAuthenticationFilter jwtAuthenticationFilter(TokenConfig tokenConfig, CurrentUserService currentUserService, UserProfileResolverService userProfileResolverService, CustomerRepository customerRepository, UserAccountRepository userAccountRepository) {
+        return new JwtAuthenticationFilter(tokenConfig, currentUserService, userProfileResolverService, customerRepository, userAccountRepository);
     }
 
     @Bean
@@ -46,15 +51,17 @@ public class SecurityConfig {
 
         http.csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> {
-                    configureTravelEndpoints(auth);
-                    configureTravelTrackingEndpoints(auth);
                     configurePermitAllEndpoints(auth);
-                    configureAdminsEndpoints(auth);
                     configureDriverEndpoints(auth);
                     configureStudentEndpoints(auth);
-                    configureGpsEndpoints(auth);
-                    configureCustomersEndpoints(auth);
+                    configureTravelEndpoints(auth);
+                    configureTravelTrackingEndpoints(auth);
+                    configureStudentRouteStopEndpoints(auth);
+                    configureRouteStopAssignmentEndpoints(auth);
+                    configureRouteStopEndpoints(auth);
                     configureStandardRouteEndpoints(auth);
+                    configureCustomersEndpoints(auth);
+                    configureAdminsEndpoints(auth);
                     configureAnyRequireAuthEndpoints(auth);
                 })
                 // tratamento de exceptions do spring security
@@ -98,14 +105,10 @@ public class SecurityConfig {
 
     private void configureTravelEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
         auth
-                .requestMatchers("/v1/travel/create").hasRole(ROLE_DRIVER)
-                .requestMatchers("/v1/travel/{travelId}/start").hasRole(ROLE_DRIVER)
-                .requestMatchers("/v1/travel/{travelId}/end").hasRole(ROLE_DRIVER)
-
                 .requestMatchers("/v1/travel/{travelId}/join").hasRole(ROLE_USER)
                 .requestMatchers("/v1/travel/{travelId}/leave").hasRole(ROLE_USER)
 
-                .requestMatchers("/v1/travel/{travelId}/preview").hasRole(ROLE_DRIVER);
+                .requestMatchers("/v1/travel/**").hasRole(ROLE_DRIVER);
     }
 
     private void configureTravelTrackingEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
@@ -125,29 +128,48 @@ public class SecurityConfig {
 
     private void configureAdminsEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
         auth.requestMatchers("/v1/admins/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
+//        auth.requestMatchers("/v1/admins/**").permitAll();
     }
 
     private void configureDriverEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth.requestMatchers(HttpMethod.POST, "/v1/drivers").permitAll();
+
+        auth.requestMatchers("/v1/drivers/me").hasAnyRole(ROLE_DRIVER);
         auth.requestMatchers("/v1/drivers/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
     }
 
     private void configureStudentEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth.requestMatchers(HttpMethod.POST, "/v1/students/").permitAll();
+
         auth.requestMatchers("/v1/students/me").hasAnyRole(ROLE_USER, ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
         auth.requestMatchers("/v1/students/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
     }
 
-    private void configureGpsEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
-        auth.requestMatchers("/v1/gps/**").hasAnyRole(ROLE_DRIVER, ROLE_PLATFORM_ADMIN);
-    }
-
     private void configureCustomersEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
         auth.requestMatchers("/v1/customers/**").hasAnyRole(ROLE_PLATFORM_ADMIN);
+//        auth.requestMatchers("/v1/customers/**").permitAll();
     }
 
     private void configureStandardRouteEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
-        auth.requestMatchers("/v1/standard-route/all").hasRole(ROLE_PLATFORM_ADMIN);
-
         auth.requestMatchers("/v1/standard-route/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
+    }
+
+    private void configureRouteStopEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth.requestMatchers("/v1/route-stops/{customerId}/customer").hasRole(ROLE_PLATFORM_ADMIN);
+
+        auth.requestMatchers("/v1/route-stops/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
+    }
+
+    private void configureRouteStopAssignmentEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth.requestMatchers("/v1/route-assignment/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN);
+    }
+
+    private void configureStudentRouteStopEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth.requestMatchers("/v1/route-assignment/{routeStopId}/associate/{standardRouteId}").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_USER);
+        auth.requestMatchers("/v1/route-assignment/{studentId}/update/{standardRouteId}").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_USER);
+        auth.requestMatchers("/v1/route-assignment/{routeStopId}/remove/{standardRouteId}").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_USER);
+
+        auth.requestMatchers("/v1/route-stop-students/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_USER, ROLE_DRIVER);
     }
 
     private void configureAnyRequireAuthEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {

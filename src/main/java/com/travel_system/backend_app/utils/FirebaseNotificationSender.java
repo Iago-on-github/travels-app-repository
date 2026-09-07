@@ -2,8 +2,8 @@ package com.travel_system.backend_app.utils;
 
 import com.google.firebase.messaging.*;
 import com.travel_system.backend_app.exceptions.DomainValidationException;
-import com.travel_system.backend_app.model.DeviceToken;
-import com.travel_system.backend_app.model.UserModel;
+import com.travel_system.backend_app.model.PushNotificationDeviceToken;
+import com.travel_system.backend_app.model.UserAccount;
 import com.travel_system.backend_app.model.dtos.notifications.PushNotificationCommandDTO;
 import com.travel_system.backend_app.model.enums.Platform;
 import com.travel_system.backend_app.repository.*;
@@ -17,16 +17,16 @@ import java.util.*;
 @Service
 public class FirebaseNotificationSender {
 
-    private final DeviceTokenRepository deviceTokenRepository;
-    private final UserRepository userRepository;
+    private final PushNotificationDeviceTokenRepository deviceTokenRepository;
+    private final UserAccountRepository userAccountRepository;
     private final NotificationRecipientResolver notificationRecipientResolver;
     private final FirebaseMessaging firebaseMessaging;
 
     private static final Logger logger = LoggerFactory.getLogger(FirebaseNotificationSender.class);
 
-    public FirebaseNotificationSender(DeviceTokenRepository deviceTokenRepository, UserRepository userRepository, NotificationRecipientResolver notificationRecipientResolver, FirebaseMessaging firebaseMessaging) {
+    public FirebaseNotificationSender(PushNotificationDeviceTokenRepository deviceTokenRepository, UserAccountRepository userAccountRepository, NotificationRecipientResolver notificationRecipientResolver, FirebaseMessaging firebaseMessaging) {
         this.deviceTokenRepository = deviceTokenRepository;
-        this.userRepository = userRepository;
+        this.userAccountRepository = userAccountRepository;
         this.notificationRecipientResolver = notificationRecipientResolver;
         this.firebaseMessaging = firebaseMessaging;
     }
@@ -35,15 +35,15 @@ public class FirebaseNotificationSender {
     public void manageUserToken(String userEmail, String token, Platform platform) {
         if (userEmail == null || token == null || token.isBlank() || platform == null) throw new DomainValidationException("Parâmetros inválidos");
 
-        UserModel user = userRepository.findUserByEmail(userEmail);
+        UserAccount user = userAccountRepository.findUserByEmail(userEmail);
 
         if (user == null) {
             throw new EntityNotFoundException("user com o email " + userEmail + " não encontrado");
         }
 
-        Optional<DeviceToken> existingDeviceToken = deviceTokenRepository.findDeviceTokenByToken(token);
+        Optional<PushNotificationDeviceToken> existingDeviceToken = deviceTokenRepository.findByToken(token);
 
-        DeviceToken deviceToken;
+        PushNotificationDeviceToken deviceToken;
         if (existingDeviceToken.isPresent()) {
             deviceToken = existingDeviceToken.get();
 
@@ -52,11 +52,11 @@ public class FirebaseNotificationSender {
                 deviceToken.setActive(true);
             }
 
-            deviceToken.setUser(user);
+            deviceToken.setUserAccount(user);
         } else {
-            deviceToken = new DeviceToken();
+            deviceToken = new PushNotificationDeviceToken();
 
-            deviceToken.setUser(user);
+            deviceToken.setUserAccount(user);
             deviceToken.setToken(token.trim());
         }
 

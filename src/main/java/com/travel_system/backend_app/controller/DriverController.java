@@ -73,7 +73,7 @@ public class DriverController {
                     content = @Content(schema = @Schema(hidden = true)))
     })
     @GetMapping()
-    public ResponseEntity<Page<DriverResponseDTO>> getDriversByStatus(@Parameter(description = "Status para filtragem dos motoristas. Se omitido, o padrão é 'ACTIVE'.", example = "ACTIVE")
+    public ResponseEntity<List<DriverResponseDTO>> getDriversByStatus(@Parameter(description = "Status para filtragem dos motoristas. Se omitido, o padrão é 'ACTIVE'.", example = "ACTIVE")
                                                                           @RequestParam(required = false) GeneralStatus status) {
         return ResponseEntity.ok().body(driverService.getDriversByStatus(status));
     }

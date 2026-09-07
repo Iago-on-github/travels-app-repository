@@ -1,33 +1,43 @@
 package com.travel_system.backend_app.service;
 
+import com.travel_system.backend_app.config.TokenConfig;
+import com.travel_system.backend_app.exceptions.DomainValidationException;
 import com.travel_system.backend_app.exceptions.ProfilePictureNotFoundException;
-import com.travel_system.backend_app.model.UserModel;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.model.UserAccount;
+import com.travel_system.backend_app.model.enums.UserAccountType;
+import com.travel_system.backend_app.repository.UserAccountRepository;
+import com.travel_system.backend_app.service.profile.UserProfileStrategy;
 import jakarta.persistence.EntityNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
-import javax.management.AttributeNotFoundException;
 import java.io.IOException;
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class CurrentUserService {
-    private final UserRepository userRepository;
+    private final UserAccountRepository userAccountRepository;
 
+    private final List<UserProfileStrategy> profileStrategies;
     private final S3StorageService s3StorageService;
     private final ImageProcessingService imageProcessingService;
+    private final UserProfileResolverService userProfileResolverService;
 
-    private Logger logger = LoggerFactory.getLogger(CurrentUserService.class);
+    private final Logger logger = LoggerFactory.getLogger(CurrentUserService.class);
 
-    public CurrentUserService(UserRepository userRepository, S3StorageService s3StorageService, ImageProcessingService imageProcessingService) {
-        this.userRepository = userRepository;
+    public CurrentUserService(UserAccountRepository userAccountRepository, S3StorageService s3StorageService, ImageProcessingService imageProcessingService, UserProfileResolverService userProfileResolverService, TokenConfig tokenConfig, List<UserProfileStrategy> profileStrategies) {
+        this.userAccountRepository = userAccountRepository;
         this.s3StorageService = s3StorageService;
         this.imageProcessingService = imageProcessingService;
+        this.userProfileResolverService = userProfileResolverService;
+        this.profileStrategies = profileStrategies;
     }
 
     // verifica se o adm logado é o adm da plataforma
@@ -37,29 +47,49 @@ public class CurrentUserService {
         return auth.getAuthorities().stream().anyMatch(p -> p.getAuthority().equals("ROLE_PLATFORM_ADMIN"));
     }
 
+    // pega o email do user autenticado
+    public String getAuthenticatedUserEmail() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal().equals("anonymousUser")) {
+            throw new AccessDeniedException("Usuário não autenticado");
+        }
+        return authentication.getName();
+    }
+
     // adiciona/atualiza profilePicture
-    public void userProfilePictureUpdate(String email, MultipartFile file) throws IOException {
+    @Transactional
+    public void updateMyProfilePicture(MultipartFile file) throws IOException {
         if (file == null || file.isEmpty()) {
-            throw new IllegalArgumentException("[userProfilePictureUpdate] - file não pode estar null");
+            throw new IllegalArgumentException("Arquivo vazio");
         }
 
-        String profilePictureKey = generateProfilePictureKey(email);
+        String email = getAuthenticatedUserEmail();
+        UserAccount userAccount = userAccountRepository.findUserByEmail(email);
 
+        if (userAccount == null) {
+            throw new EntityNotFoundException("UserAccount não encontrado");
+        }
+
+        String pictureKey = generateProfilePictureKey(userAccount);
         byte[] bytes = imageProcessingService.convertImageToJPEG(file);
-        s3StorageService.upload(bytes, profilePictureKey, "image/jpeg");
+        s3StorageService.upload(bytes, pictureKey, "image/jpeg");
 
-        int updatedPicture = userRepository.updateProfilePicture(profilePictureKey, email);
-        logger.info("countSavedWithSuccess {}", updatedPicture);
+        // handler
+        findHandler(userAccount.getUserAccountType()).updatePicture(userAccount, pictureKey);
     }
 
     // remove profilePicture
-    public void userProfilePictureDelete(String email) {
-        String userProfilePicture = getUserProfilePicture(email);
+    @Transactional
+    public void deleteMyProfilePicture() {
+        String email = getAuthenticatedUserEmail();
+        UserAccount userAccount = userAccountRepository.findUserByEmail(email);
 
-        s3StorageService.delete(userProfilePicture);
+        if (userAccount == null) {
+            throw new EntityNotFoundException("UserAccount não encontrado");
+        }
 
-        int deletePicture = userRepository.deleteProfilePictureByEmail(userProfilePicture, email);
-        logger.info("deletePicture {}", deletePicture);
+        findHandler(userAccount.getUserAccountType()).deletePicture(userAccount);
     }
 
     // retorna a url publica que o front usa para consumir as fotos
@@ -68,29 +98,20 @@ public class CurrentUserService {
     }
 
     // decide se é customer ou platform e monta a key
-    private String generateProfilePictureKey(String userEmail) {
-        boolean isPlatformAdmin = isPlatformAdmin();
+    private String generateProfilePictureKey(UserAccount userAccount) {
+        UUID customerId = userProfileResolverService.resolveCustomerId(userAccount);
+        UUID userId = userAccount.getId();
 
-        UserModel savedUser = userRepository.findUserByEmail(userEmail);
-
-        if (savedUser == null) throw new EntityNotFoundException("Entidade com email " + userEmail + " não encontrada.");
-
-        UUID customerId = null;
-        if (!isPlatformAdmin) {
-            customerId = savedUser.getCustomerId();
+        if (customerId == null) {
+            return "platform/users/" + userId + "/profile.jpeg";
         }
-
-        UUID userId = savedUser.getId();
-
-        String platformAdminKey = "platform/users/" + userId + "/profile.jpeg";
-        String customerKey = "customers/" + customerId + "/users/" + userId + "/profile.jpeg";
-
-        return isPlatformAdmin ? platformAdminKey : customerKey;
+        return "customers/" + customerId + "/users/" + userId + "/profile.jpeg";
     }
 
-    // verifica se existe profile picture atualmente para o usuário
-    private String getUserProfilePicture(String email) {
-        return userRepository.findProfilePictureByEmail(email)
-                .orElseThrow(() -> new ProfilePictureNotFoundException("Foto de perfil não encontrada"));
+    private UserProfileStrategy findHandler(UserAccountType type) {
+        return profileStrategies.stream()
+                .filter(h -> h.supports(type))
+                .findFirst()
+                .orElseThrow(() -> new DomainValidationException("Nenhum handler registrado para o tipo: " + type));
     }
 }

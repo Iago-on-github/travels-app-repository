@@ -2,8 +2,9 @@ package com.travel_system.backend_app.service;
 
 import com.mapbox.geojson.Point;
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.interfaces.mappers.RouteStopResponseMapper;
-import com.travel_system.backend_app.interfaces.mappers.StandardRouteResponseMapper;
+import com.travel_system.backend_app.infrastructure.TenantContext;
+import com.travel_system.backend_app.interfaces.mappers.response.RouteStopResponseMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.StandardRouteResponseMapper;
 import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.StudentTrackingPositionDTO;
 import com.travel_system.backend_app.model.dtos.TravelPreviewDTO;
@@ -16,12 +17,11 @@ import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.enums.*;
 import com.travel_system.backend_app.repository.*;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
-import org.jspecify.annotations.NonNull;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
 import java.time.Instant;
@@ -78,10 +78,16 @@ public class TravelService {
     public TravelResponseDTO createTravel(TravelRequestDTO travelRequestDTO) {
         Travel travel = new Travel();
 
-        Driver driver = driverRepository.findById(travelRequestDTO.driverId())
-                .orElseThrow(EntityNotFoundException::new);
+        // recupera o customerId e valida
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido para criar uma viagem.");
+        }
 
-        if (driver.getStatus().equals(GeneralStatus.INACTIVE)) {
+        Driver driver = driverRepository.findById(travelRequestDTO.driverId())
+                .orElseThrow(() -> new EntityNotFoundException("Motorista não encontrado"));
+
+        if (driver.getStatus() == GeneralStatus.INACTIVE) {
             throw new InactiveDriverException("Motorista inativo, não é possível prosseguir. driverId: " + driver.getId());
         }
 
@@ -90,9 +96,6 @@ public class TravelService {
         if (hasActiveTravel) {
             throw new TravelException("Motorista já possui uma viagem em andamento, não é possível prosseguir: " + driver.getId());
         }
-
-        // customer da viagem é herdado diretamente do driver
-        travel.setCustomerId(driver.getCustomerId());
 
         travel.setOriginLongitude(travelRequestDTO.originLongitude());
         travel.setOriginLatitude(travelRequestDTO.originLatitude());
@@ -116,12 +119,12 @@ public class TravelService {
         StandardRoute standardRoute = standardRouteRepository.findById(travelRequestDTO.standardRouteId())
                 .orElseThrow(() -> new EntityNotFoundException("Rota Padrão não encontrada"));
 
-        if (standardRoute.getStatus().equals(GeneralStatus.INACTIVE)) {
+        if (standardRoute.getStatus() == GeneralStatus.INACTIVE) {
             throw new StandardRouteException("A Rota Padão está INATIVA no sistema");
         }
 
         // verifica compatibilidade entre Customers
-        if (!isSameCustomer(travel.getCustomerId(), standardRoute.getCustomerId())) {
+        if (!isSameCustomer(customerId, standardRoute.getCustomerId())) {
             throwTravelException("A Rota Padrão deve obrigariamente ser do mesmo customer da Viagem");
         }
 
@@ -436,6 +439,7 @@ public class TravelService {
     }
 
     // responsável por obter apenas a viagem onde o estudante está atualmente embarcado
+    @Transactional(readOnly = true)
     public ActiveStudentTravelDTO getActiveTravelByStudent(String studentEmail) {
         // retorna os dados com base na viagem que o estudante está vinculado
 
@@ -444,6 +448,7 @@ public class TravelService {
                 .orElseThrow(() -> new StudentNotLinkedToTripException("Estudante " + studentEmail + " não está ativo em nenhuma viagem"));
     }
 
+    @Transactional(readOnly = true)
     public Set<StudentTrackingPositionDTO> linkedStudentTravel(UUID travelId) {
         long start = System.currentTimeMillis(); // debbuging
 
@@ -462,6 +467,7 @@ public class TravelService {
     }
 
     // recupera a rota padrão da viagem
+    @Transactional(readOnly = true)
     public StandardRouteResponseDTO getTravelStandardRoute(UUID travelId) {
         StandardRoute standardRouteByTravel = travelRepository.findStandardRouteByTravelId(travelId);
 
@@ -473,11 +479,13 @@ public class TravelService {
     }
 
     @Cacheable(value = "studentLogged", key = "#studentId + '-' + #travelId")
+    @Transactional(readOnly = true)
     public boolean isStudentLogged(UUID studentId, UUID travelId) {
-            return studentTravelRepository.existsByIdAndTravelId(studentId, travelId);
+        return studentTravelRepository.existsByIdAndTravelId(studentId, travelId);
     }
 
     @Cacheable(value = "driverLogged", key = "#userId + '-' + #travelId")
+    @Transactional(readOnly = true)
     public boolean isDriverLogged(String userId, UUID travelId) {
         // o "user" é o UUID do usuário logado
         try {
@@ -490,6 +498,7 @@ public class TravelService {
         }
     }
 
+    @Transactional(readOnly = true)
     public TravelPreviewDTO getTravelPreview(UUID travelId) {
         Travel travel = travelRepository.findById(travelId)
                 .orElseThrow(() -> new EntityNotFoundException("Viagem " + travelId + " não encontrada"));
@@ -553,7 +562,7 @@ public class TravelService {
             studentTravelRouteStopService.initializeStudentTravelRouteStopTracking(travel.getId(), studentTravel.getId());
         }
 
-        travelStudentStateCacheService.evictStudentTravelCachedData(travel.getId(), student.getEmail());
+        travelStudentStateCacheService.evictStudentTravelCachedData(travel.getId(), student.getUserAccount().getEmail());
 
         // armazena métrica de salvamento em cache
 
@@ -624,7 +633,7 @@ public class TravelService {
                 driver.getId(),
                 driver.getName(),
                 driver.getLastName(),
-                driver.getEmail(),
+                driver.getUserAccount().getEmail(),
                 driver.getTelephone(),
                 driver.getProfilePicture(),
                 driver.getCreatedAt(),

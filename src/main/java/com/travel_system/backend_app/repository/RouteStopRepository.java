@@ -13,7 +13,7 @@ import java.util.UUID;
 
 @Repository
 public interface RouteStopRepository extends JpaRepository<RouteStop, UUID> {
-    @Query("SELECT rs FROM RouteStop rs WHERE rs.customerId = :customerId")
+    @Query("SELECT DISTINCT rs FROM RouteStop rs LEFT JOIN FETCH rs.routeStopAssignments rsa LEFT JOIN FETCH rsa.routeStop WHERE rs.customerId = :customerId")
     List<RouteStop> findRouteStopsByCustomerId(@Param("customerId") UUID customerId);
 
     Optional<RouteStop> findByName(String routeName);

@@ -4,27 +4,17 @@ import com.travel_system.backend_app.events.NewLocationReceivedEvents;
 import com.travel_system.backend_app.events.StudentAwayStateCheckEvent;
 import com.travel_system.backend_app.events.VehicleGpsMessageDTO;
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.model.GeoPosition;
-import com.travel_system.backend_app.model.StudentTravel;
-import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.AnalyzeMovementStateDTO;
 import com.travel_system.backend_app.model.dtos.cache.TravelCacheDTO;
 import com.travel_system.backend_app.model.dtos.mapboxApi.*;
 import com.travel_system.backend_app.model.dtos.request.RouteDeviationRequestDTO;
 import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
-import com.travel_system.backend_app.model.dtos.response.ActiveStudentTravelDTO;
-import com.travel_system.backend_app.model.dtos.response.DistanceResponseDTO;
-import com.travel_system.backend_app.model.dtos.response.StudentTravelResponseDTO;
 import com.travel_system.backend_app.model.dtos.route.LocationPointDTO;
 import com.travel_system.backend_app.model.dtos.route.TravelTrackingSummaryDTO;
-import com.travel_system.backend_app.model.enums.StudentTravelStatus;
 import com.travel_system.backend_app.model.enums.TravelStatus;
 import com.travel_system.backend_app.repository.StudentTravelRepository;
 import com.travel_system.backend_app.repository.TravelLocationHistoryRepository;
 import com.travel_system.backend_app.repository.TravelRepository;
-import jakarta.persistence.EntityNotFoundException;
-import org.checkerframework.checker.units.qual.Current;
-import org.hibernate.jdbc.BatchedTooManyRowsAffectedException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
@@ -33,14 +23,9 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
-import javax.xml.stream.Location;
-import java.awt.*;
 import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
-import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 
@@ -189,7 +174,7 @@ public class TravelTrackingService {
     // recalculando o ETA e salvando a localização e os metadados da viagem no Redis
     public void processNewLocation(VehicleLocationRequestDTO vehicleLocationRequest) {
         if (vehicleLocationRequest == null || vehicleLocationRequest.travelId() == null || vehicleLocationRequest.latitude() == null || vehicleLocationRequest.longitude() == null) {
-            throw new EmptyMandatoryFieldsFound("[processNewLocation] campos de entrada obrigatórios null ou inválidos: " + vehicleLocationRequest);
+            throw new EmptyMandatoryFieldsFoundException("[processNewLocation] campos de entrada obrigatórios null ou inválidos: " + vehicleLocationRequest);
         }
 
         UUID travelId = vehicleLocationRequest.travelId();
@@ -312,7 +297,7 @@ public class TravelTrackingService {
     // fornece um histórico de points salvos no banco
     public Page<LocationPointDTO> getTravelHistory(UUID travelId) {
         if (travelId == null) {
-            throw new EmptyMandatoryFieldsFound("[getTravelHistory] Dados de parâmetros inválidos ou não encontrados");
+            throw new EmptyMandatoryFieldsFoundException("[getTravelHistory] Dados de parâmetros inválidos ou não encontrados");
         }
 
         Pageable pageable = PageRequest.of(0, 100);

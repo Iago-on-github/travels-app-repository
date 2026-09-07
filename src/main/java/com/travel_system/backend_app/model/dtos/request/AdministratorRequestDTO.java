@@ -1,7 +1,10 @@
 package com.travel_system.backend_app.model.dtos.request;
 
 
+import com.fasterxml.jackson.annotation.JsonFormat;
+
 import javax.validation.constraints.*;
+import java.time.LocalDate;
 import java.util.UUID;
 
 public record AdministratorRequestDTO(
@@ -22,12 +25,13 @@ public record AdministratorRequestDTO(
         @NotBlank
         @Min(11)
         String cpf,
-        String birthDate,
+        @Past(message = "A data de nascimento deve estar no passado")
+        @JsonFormat(pattern = "dd/MM/yyyy")
+        LocalDate birthdate,
+        String jobTitle,
         @NotNull
         @Min(8)
         @NotBlank(message = "Campo 'Telefone' é obrigatório")
-        String telephone,
-        @NotNull @NotBlank
-        UUID customerId
+        String telephone
 ) {
 }

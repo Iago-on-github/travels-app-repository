@@ -1,83 +1,85 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.config.TokenConfig;
+import com.travel_system.backend_app.model.Permissions;
+import com.travel_system.backend_app.model.UserAccount;
 import com.travel_system.backend_app.model.dtos.request.LoginRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.LoginResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.RefreshTokenResponseDTO;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
 public class AuthService {
 
-    private final UserRepository userRepository;
+    private final UserAccountRepository userAccountRepository;
+
+    private final UserProfileResolverService userProfileResolverService;
     private final AuthenticationManager authenticationManager;
     private final TokenConfig tokenConfig;
 
-    public AuthService(UserRepository userRepository, AuthenticationManager authenticationManager, TokenConfig tokenConfig) {
-        this.userRepository = userRepository;
+    public AuthService(UserAccountRepository userAccountRepository, UserProfileResolverService userProfileResolverService, AuthenticationManager authenticationManager, TokenConfig tokenConfig) {
+        this.userAccountRepository = userAccountRepository;
+        this.userProfileResolverService = userProfileResolverService;
         this.authenticationManager = authenticationManager;
         this.tokenConfig = tokenConfig;
     }
 
+    @Transactional(readOnly = true)
     public LoginResponseDTO signing(LoginRequestDTO loginRequestDto) {
+        // valdiações
         if (loginRequestDto == null || loginRequestDto.email() == null || loginRequestDto.password() == null) {
             throw new BadCredentialsException("Email ou senha inválidos");
         }
 
+        // processa a autenticação
         try {
             authenticationManager.authenticate(new UsernamePasswordAuthenticationToken(loginRequestDto.email(), loginRequestDto.password()));
         } catch (Exception e) {
             throw new BadCredentialsException("Email ou senha inválidos. Tente novamente");
         }
 
-        var user = userRepository.findUserByEmail(loginRequestDto.email());
+        var userAccount = userAccountRepository.findUserByEmail(loginRequestDto.email());
 
-        if (user == null){
+        if (userAccount == null){
             throw new EntityNotFoundException("Email não encontrado. Tente novamente");
         }
 
-        UUID customerId = user.getCustomerId() != null ? user.getCustomerId() : null;
+        /*
+        * service realiza a validação de quem exatamente está realizando o login e recupera o customerId dela
+        * */
+        UUID customerId = userProfileResolverService.resolveCustomerId(userAccount);
 
-        var tokenResponse = tokenConfig.createAccessToken(loginRequestDto.email(), user.getRoles(), customerId);
+        // extrai as ROLES
+        List<String> roles = userAccount.getPermissions().stream()
+                .map(Permissions::getDescription).toList();
 
-        return new LoginResponseDTO(
-                tokenResponse.username(),
-                tokenResponse.authenticated(),
-                tokenResponse.created(),
-                tokenResponse.expiration(),
-                tokenResponse.accessToken(),
-                tokenResponse.refreshToken());
+        // retorna o token
+        return tokenConfig.createAccessToken(loginRequestDto.email(), roles, customerId, userAccount.getUserAccountType());
     }
 
-    public RefreshTokenResponseDTO refreshToken(String email, String refreshToken, UUID customerId) {
-        boolean rolePlatformAdmin = tokenConfig.getRolesFromToken(refreshToken).contains("ROLE_PLATFORM_ADMIN");
-
-        if (customerId == null && rolePlatformAdmin) {
-            final String ROLE_PLATFORM_ADMIN = "ROLE_PLATFORM_ADMIN";
-            userRepository.findByEmailAndRole(email, ROLE_PLATFORM_ADMIN).orElseThrow(() -> new EntityNotFoundException("Platform Admin não encontrado"));
-        } else {
-            if (customerId == null) throw new BadCredentialsException("Usuário " + email + " mal formado com customerId ausente");
-
-            userRepository.findByEmailAndCustomerId(email, customerId)
-                    .orElseThrow(() -> new EntityNotFoundException("Entidade com o email " + email + " não encontrado"));
+    @Transactional(readOnly = true)
+    public RefreshTokenResponseDTO refreshToken(String refreshToken, UUID customerId) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new BadCredentialsException("Token de refresh não fornecido.");
         }
 
-        var refreshedToken = tokenConfig.refreshToken(refreshToken);
+        String email = tokenConfig.getSubjectFromToken(refreshToken);
 
-        return new RefreshTokenResponseDTO(
-                refreshedToken.accessToken(),
-                refreshedToken.refreshToken(),
-                refreshedToken.expiresAt());
+        UserAccount userAccount = userAccountRepository.findUserByEmail(email);
+
+        if (userAccount == null) {
+            throw new EntityNotFoundException("UserAccount não encontrado");
+        }
+
+        return tokenConfig.refreshToken(refreshToken, userAccount.getUserAccountType());
     }
 }

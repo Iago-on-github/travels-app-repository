@@ -1,52 +1,66 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.*;
-import com.travel_system.backend_app.interfaces.mappers.AdministratorMapper;
+import com.travel_system.backend_app.interfaces.mappers.AdministratorRequestMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.AdministratorResponseMapper;
 import com.travel_system.backend_app.model.Administrator;
-import com.travel_system.backend_app.model.Customer;
 import com.travel_system.backend_app.model.Permissions;
+import com.travel_system.backend_app.model.UserAccount;
 import com.travel_system.backend_app.model.dtos.request.AdministratorRequestDTO;
 import com.travel_system.backend_app.model.dtos.request.AdministratorUpdateDTO;
-import com.travel_system.backend_app.model.dtos.request.PlatformAdministratorRequestDTO;
 import com.travel_system.backend_app.model.dtos.response.AdministratorResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
+import com.travel_system.backend_app.model.enums.UserAccountType;
 import com.travel_system.backend_app.repository.AdministratorRepository;
 import com.travel_system.backend_app.repository.CustomerRepository;
 import com.travel_system.backend_app.repository.PermissionsRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
 public class AdministratorService {
+
     private final AdministratorRepository administratorRepository;
     private final CustomerRepository customerRepository;
-    private final PasswordEncoder passwordEncoder;
     private final PermissionsRepository permissionsRepository;
-    private final AdministratorMapper administratorMapper;
+    private final UserAccountRepository userAccountRepository;
+
     private final CurrentUserService currentUserService;
 
-    @Autowired
-    public AdministratorService(AdministratorRepository administratorRepository, CustomerRepository customerRepository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository, AdministratorMapper administratorMapper, CurrentUserService currentUserService) {
+    private final AdministratorRequestMapper administratorRequestMapper;
+    private final AdministratorResponseMapper administratorResponseMapper;
+
+    private final PasswordEncoder passwordEncoder;
+
+    public AdministratorService(AdministratorRepository administratorRepository, CustomerRepository customerRepository, PasswordEncoder passwordEncoder, PermissionsRepository permissionsRepository, UserAccountRepository userAccountRepository, AdministratorRequestMapper administratorRequestMapper, CurrentUserService currentUserService, AdministratorResponseMapper administratorResponseMapper) {
         this.administratorRepository = administratorRepository;
         this.customerRepository = customerRepository;
         this.passwordEncoder = passwordEncoder;
         this.permissionsRepository = permissionsRepository;
-        this.administratorMapper = administratorMapper;
+        this.userAccountRepository = userAccountRepository;
+        this.administratorRequestMapper = administratorRequestMapper;
         this.currentUserService = currentUserService;
+        this.administratorResponseMapper = administratorResponseMapper;
     }
 
+    @Transactional(readOnly = true)
     public Page<AdministratorResponseDTO> getAllAdministrators() {
+
+        /*
+        * realiza a valdação com base em quem está fazendo a requisição
+        * platformADMIN pode recuperar todos
+        * admin normal somente aqueles do seu customer
+        * */
+
         Pageable pageable = PageRequest.of(0, 10);
 
         boolean platformAdmin = currentUserService.isPlatformAdmin();
@@ -59,10 +73,20 @@ public class AdministratorService {
             allAdmins = administratorRepository.findAllWithCustomerId(pageable);
         }
 
-        return allAdmins.map(this::admConverted);
+        return allAdmins.map(administratorResponseMapper::toDTO);
     }
 
+    @Transactional(readOnly = true)
     public Page<AdministratorResponseDTO> getAllAdministratorsByStatus(GeneralStatus status) {
+
+        /*
+         * realiza a valdação com base em quem está fazendo a requisição
+         * platformADMIN pode recuperar todos
+         * admin normal somente aqueles do seu customer
+         *
+         * status sendo enviado como NULL = seta automaticamente para ACTIVE
+         * */
+
         if (status == null) status = GeneralStatus.ACTIVE;
 
         Pageable pageable = PageRequest.of(0, 10);
@@ -76,113 +100,81 @@ public class AdministratorService {
             administrators = administratorRepository.findByStatus(status, pageable);
         }
 
-        return administrators.map(this::admConverted);
+        return administrators.map(administratorResponseMapper::toDTO);
     }
 
+    @Transactional(readOnly = true)
     public AdministratorResponseDTO getCurrentAdministrator(String authenticatedAdmEmail) {
         Administrator expectedLoggedAdmin = administratorRepository.findByEmail(authenticatedAdmEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Administrador não encontrado"));
 
-        return admConverted(expectedLoggedAdmin);
+        return administratorResponseMapper.toDTO(expectedLoggedAdmin);
     }
 
     @Transactional
     public AdministratorResponseDTO createAdministrator(AdministratorRequestDTO admRequestDTO) {
         checkFieldsIsNull(admRequestDTO);
 
-        Optional<Administrator> existingAdministratorEmail = administratorRepository.findByEmail(admRequestDTO.email());
-        Optional<Administrator> existingAdministratorTelephone = administratorRepository.findByTelephone(admRequestDTO.telephone());
+        // validações de duplicação de recursos no sistema
+        if (userAccountRepository.existsByEmail(admRequestDTO.email())) throw new DuplicateResourceException("Email " + admRequestDTO.email()  + "já registrado");
+        if (administratorRepository.existsByTelephone(admRequestDTO.telephone())) throw new DuplicateResourceException("Telefone " + admRequestDTO.telephone() + " já registrado");
+        if (administratorRepository.existsByCpf(admRequestDTO.cpf())) throw new DuplicateResourceException("CPF já registrado");
 
-        if (existingAdministratorEmail.isPresent()) throw new DuplicateResourceException("Email já registrado");
-        if (existingAdministratorTelephone.isPresent()) throw new DuplicateResourceException("Telefone já registrado");
-
-        final String ROLE_ADMIN = "ROLE_ADMIN";
+/*        final String ROLE_ADMIN = "ROLE_ADMIN";
         Permissions admPerm = permissionsRepository.findByDescription(ROLE_ADMIN)
-                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + ROLE_ADMIN + " não encontrada."));
+                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + ROLE_ADMIN + " não encontrada."));*/
 
-        Customer customer = customerRepository.findById(admRequestDTO.customerId())
-                .orElseThrow(() -> new EntityNotFoundException("Customer " + admRequestDTO.customerId() + " não encontrado"));
+        // cria novo UserAccount p/ o admin
+        UserAccount userAccount = new UserAccount();
+        userAccount.setEmail(admRequestDTO.email());
+        userAccount.setPassword(passwordEncoder.encode(admRequestDTO.password()));
+        userAccount.setPermissions(List.of());
+        userAccount.setUserAccountType(UserAccountType.UNASSIGNED);
 
-        Administrator adm = admMapper(admRequestDTO);
+        UserAccount savedUserAccount = userAccountRepository.save(userAccount);
 
-        adm.setPermissions(List.of(admPerm));
-        adm.setCustomerId(customer.getId());
+        // cria entidade Administrator com MapStruct
+        Administrator administrator = administratorRequestMapper.toEntity(admRequestDTO);
 
-        Administrator savedAdm = administratorRepository.save(adm);
-        return admConverted(savedAdm);
-    }
+        // faz o vínculo da userAccount
+        administrator.setUserAccount(savedUserAccount);
 
-    @Transactional
-    public AdministratorResponseDTO createPlatformAdministrator(PlatformAdministratorRequestDTO platformAdmRequestDTO) {
-        boolean platformAdmin = currentUserService.isPlatformAdmin();
+        Administrator savedAdm = administratorRepository.save(administrator);
 
-        if (!platformAdmin) {
-            throw new NotAuthorizedException("Administrador sem permissão necessária para criar Administradores de Plataforma.");
-        }
-
-        checkFieldsIsNull(platformAdmRequestDTO);
-
-        Optional<Administrator> existingAdministratorEmail = administratorRepository.findByEmail(platformAdmRequestDTO.email());
-        Optional<Administrator> existingAdministratorTelephone = administratorRepository.findByTelephone(platformAdmRequestDTO.telephone());
-
-        if (existingAdministratorEmail.isPresent()) throw new DuplicateResourceException("Email já registrado");
-        if (existingAdministratorTelephone.isPresent()) throw new DuplicateResourceException("Telefone já registrado");
-
-        final String ROLE_PLATFORM = "ROLE_PLATFORM_ADMIN";
-        Permissions admPerm = permissionsRepository.findByDescription(ROLE_PLATFORM)
-                .orElseThrow(() -> new PermissionNotFoundException("Permissão " + ROLE_PLATFORM + " não encontrada."));
-
-        Administrator adm = admPlatformMapper(platformAdmRequestDTO);
-
-        adm.setPermissions(List.of(admPerm));
-
-        Administrator savedAdm = administratorRepository.save(adm);
-        return admConverted(savedAdm);
+        return administratorResponseMapper.toDTO(savedAdm);
     }
 
     @Transactional
     public AdministratorResponseDTO updateCurrentAdministrator(String authenticatedEmail, AdministratorUpdateDTO admRequestDTO) {
-        boolean platformAdmin = currentUserService.isPlatformAdmin();
-
-        if (!platformAdmin) {
-            throw new NotAuthorizedException("Administrador sem permissão necessária para alterar Administratores de Plataforma.");
-        }
-
         Administrator loggedAdm = administratorRepository.findByEmail(authenticatedEmail)
                 .orElseThrow(() -> new EntityNotFoundException("Administrador não encontrado, " + authenticatedEmail));
 
-        if (loggedAdm.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Não é possível atualizar uma conta desativada");
+        if (loggedAdm.getStatus() == GeneralStatus.INACTIVE) throw new InactiveAccountModificationException("Não é possível atualizar uma conta desativada");
 
-        if (admRequestDTO.email() != null || admRequestDTO.telephone() != null) {
-            administratorRepository.findByEmailOrTelephoneAndIdNot(
-                    admRequestDTO.email(),
-                    admRequestDTO.telephone(),
-                    loggedAdm.getId())
-                    .ifPresent(admin -> {
-                        throw new DuplicateResourceException("Email ou telefone já em uso por outro usuário.");
-                    });
+        // validações de duplicação de recursos no sistema
+        if (userAccountRepository.existsByEmail(admRequestDTO.email())) throw new DuplicateResourceException("Email " + admRequestDTO.email()  + "já registrado");
+        if (administratorRepository.existsByTelephone(admRequestDTO.telephone())) throw new DuplicateResourceException("Telefone " + admRequestDTO.telephone() + " já registrado");
+
+        // usa MapStruct p/ atualizar apenas os campos não nulos
+        administratorRequestMapper.administratorUpdateFromDTO(admRequestDTO, loggedAdm);
+
+        UserAccount userAccount = loggedAdm.getUserAccount();
+
+        if (admRequestDTO.email() != null) {
+            userAccount.setEmail(admRequestDTO.email());
         }
 
-        administratorMapper.administratorUpdateFromDTO(admRequestDTO, loggedAdm);
-
-        if (admRequestDTO.password() != null) {
-            loggedAdm.setPassword(passwordEncoder.encode(admRequestDTO.password()));
+        if (admRequestDTO.password() != null && !admRequestDTO.password().isBlank()) {
+            userAccount.setPassword(passwordEncoder.encode(admRequestDTO.password()));
         }
-
-        loggedAdm.setUpdatedAt(LocalDateTime.now());
 
         Administrator savedAdmin = administratorRepository.save(loggedAdm);
-        return admConverted(savedAdmin);
+
+        return administratorResponseMapper.toDTO(savedAdmin);
     }
 
     @Transactional
     public void updateAdministrator(UUID id, GeneralStatus newStatus) {
-        boolean platformAdmin = currentUserService.isPlatformAdmin();
-
-/*        if (!platformAdmin) {
-            throw new NotAuthorizedException("Administrador sem permissão necessária para alterar Administratores de Plataforma.");
-        }*/
-
         Administrator expectedAdministrator = administratorRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Administrador não encontrado: " + id));
 
@@ -193,72 +185,11 @@ public class AdministratorService {
         administratorRepository.save(expectedAdministrator);
     }
 
-    // MÉTODOS AUXILIARES
-    // MÉTODOS AUXILIARES
-    // MÉTODOS AUXILIARES
-
     private void checkFieldsIsNull(AdministratorRequestDTO admRequestDTO) {
        if (admRequestDTO.email() == null || admRequestDTO.password() == null ||
-               admRequestDTO.name() == null || admRequestDTO.cpf() == null || admRequestDTO.telephone() == null ||
-       admRequestDTO.customerId() == null)  {
-           throw new EmptyMandatoryFieldsFound("Você deve preencher todos os campos requeridos.");
+               admRequestDTO.name() == null || admRequestDTO.cpf() == null || admRequestDTO.telephone() == null)  {
+           throw new EmptyMandatoryFieldsFoundException("Você deve preencher todos os campos requeridos.");
        }
     }
 
-    private void checkFieldsIsNull(PlatformAdministratorRequestDTO platformAdmRequestDTO) {
-        if (platformAdmRequestDTO.email() == null || platformAdmRequestDTO.password() == null ||
-                platformAdmRequestDTO.name() == null || platformAdmRequestDTO.cpf() == null || platformAdmRequestDTO.telephone() == null)  {
-            throw new EmptyMandatoryFieldsFound("Você deve preencher todos os campos requeridos.");
-        }
-    }
-
-    private Administrator admMapper(AdministratorRequestDTO admRequestDto) {
-        Administrator adm = new Administrator();
-
-        adm.setEmail(admRequestDto.email());
-        adm.setPassword(passwordEncoder.encode(admRequestDto.password()));
-        adm.setName(admRequestDto.name());
-        adm.setLastName(admRequestDto.lastName());
-        adm.setCpf(admRequestDto.cpf());
-        adm.setBirthDate(admRequestDto.birthDate());
-        adm.setTelephone(admRequestDto.telephone());
-        adm.setStatus(GeneralStatus.ACTIVE);
-        adm.setCreatedAt(LocalDateTime.now());
-
-        return adm;
-    }
-
-    private Administrator admPlatformMapper(PlatformAdministratorRequestDTO admRequestDto) {
-        Administrator adm = new Administrator();
-
-        adm.setEmail(admRequestDto.email());
-        adm.setPassword(passwordEncoder.encode(admRequestDto.password()));
-        adm.setName(admRequestDto.name());
-        adm.setLastName(admRequestDto.lastName());
-        adm.setCpf(admRequestDto.cpf());
-        adm.setBirthDate(admRequestDto.birthDate());
-        adm.setTelephone(admRequestDto.telephone());
-        adm.setStatus(GeneralStatus.ACTIVE);
-        adm.setCreatedAt(LocalDateTime.now());
-
-        return adm;
-    }
-
-    private AdministratorResponseDTO admConverted(Administrator adm) {
-        UUID customerId = adm.getCustomerId() != null ? adm.getCustomerId() : null;
-
-        return new AdministratorResponseDTO(
-                adm.getId(),
-                adm.getEmail(),
-                adm.getName(),
-                adm.getLastName(),
-                adm.getBirthDate(),
-                adm.getTelephone(),
-                currentUserService.getPublicUrl(adm.getProfilePicture()),
-                adm.getStatus(),
-                adm.getCreatedAt(),
-                adm.getUpdatedAt(),
-                customerId
-        );
-    }
 }

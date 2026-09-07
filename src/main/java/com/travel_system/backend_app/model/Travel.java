@@ -19,6 +19,7 @@ public class Travel extends BaseTenantEntity {
     private UUID id;
     @Enumerated(value = EnumType.STRING)
     private TravelStatus travelStatus;
+    private int busNumber;
     @ManyToOne
     @JoinColumn(name = "driver_id")
     private Driver driver;
@@ -51,9 +52,10 @@ public class Travel extends BaseTenantEntity {
     public Travel() {
     }
 
-    public Travel(UUID id, TravelStatus travelStatus, Driver driver, TravelPeriod travelPeriod, Instant createdAt, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Double duration, Double distance, String destinationCity, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude, StandardRoute standardRoute) {
+    public Travel(UUID id, TravelStatus travelStatus, int busNumber, Driver driver, TravelPeriod travelPeriod, Instant createdAt, Instant startHourTravel, Instant endHourTravel, String polylineRoute, Double duration, Double distance, String destinationCity, Double originLatitude, Double originLongitude, Double finalLatitude, Double finalLongitude, StandardRoute standardRoute) {
         this.id = id;
         this.travelStatus = travelStatus;
+        this.busNumber = busNumber;
         this.driver = driver;
         this.travelPeriod = travelPeriod;
         this.createdAt = createdAt;
@@ -84,6 +86,14 @@ public class Travel extends BaseTenantEntity {
 
     public void setTravelStatus(TravelStatus travelStatus) {
         this.travelStatus = travelStatus;
+    }
+
+    public int getBusNumber() {
+        return busNumber;
+    }
+
+    public void setBusNumber(int busNumber) {
+        this.busNumber = busNumber;
     }
 
     public Driver getDriver() {

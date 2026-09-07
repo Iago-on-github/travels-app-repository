@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.utils;
 
 import com.travel_system.backend_app.config.RabbitMQConfig;
+import com.travel_system.backend_app.infrastructure.TenantFilterAspect;
 import com.travel_system.backend_app.model.dtos.mensageria.StudentProximityNotificationMessage;
 import com.travel_system.backend_app.model.dtos.request.VehicleLocationRequestDTO;
 import com.travel_system.backend_app.model.dtos.route.GpsPayload;
@@ -21,7 +22,7 @@ public class RabbitMQConsumers {
     private final TravelHistoryPingsService travelHistoryPingsService;
     private final TravelTrackingNotificationService trackingNotificationService;
 
-    public RabbitMQConsumers(RedisTrackingService redisTrackingService, TravelHistoryPingsService travelHistoryPingsService, TravelTrackingNotificationService trackingNotificationService) {
+    public RabbitMQConsumers(RedisTrackingService redisTrackingService, TravelHistoryPingsService travelHistoryPingsService, TravelTrackingNotificationService trackingNotificationService, TenantFilterAspect tenantFilterAspect) {
         this.redisTrackingService = redisTrackingService;
         this.travelHistoryPingsService = travelHistoryPingsService;
         this.trackingNotificationService = trackingNotificationService;

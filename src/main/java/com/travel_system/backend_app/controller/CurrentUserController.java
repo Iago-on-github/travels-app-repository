@@ -42,10 +42,8 @@ public class CurrentUserController {
             @ApiResponse(responseCode = "503", description = "Service Unavailable: Falha ao enviar a imagem para o serviço de armazenamento.")
     })
     @PutMapping(value = "/update", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<Void> updateProfilePicture(Authentication auth, @RequestParam("file") MultipartFile file) throws IOException {
-        String email = auth.getName();
-
-        currentUserService.userProfilePictureUpdate(email, file);
+    public ResponseEntity<Void> updateProfilePicture(@RequestParam("file") MultipartFile file) throws IOException {
+        currentUserService.updateMyProfilePicture(file);
         return ResponseEntity.noContent().build();
     }
 
@@ -64,10 +62,8 @@ public class CurrentUserController {
             @ApiResponse(responseCode = "503", description = "Service Unavailable: Falha ao enviar a imagem para o serviço de armazenamento.")
     })
     @PutMapping(value = "/delete")
-    public ResponseEntity<Void> deleteProfilePicture(Authentication auth) {
-        String email = auth.getName();
-
-        currentUserService.userProfilePictureDelete(email);
+    public ResponseEntity<Void> deleteProfilePicture() {
+        currentUserService.deleteMyProfilePicture();
         return ResponseEntity.noContent().build();
     }
 }

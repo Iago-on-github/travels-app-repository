@@ -1,6 +1,7 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.EtaDataStatesInvalidException;
+import com.travel_system.backend_app.infrastructure.TenantFilterAspect;
 import com.travel_system.backend_app.model.Travel;
 import com.travel_system.backend_app.model.dtos.VelocityAnalysisDTO;
 import com.travel_system.backend_app.model.dtos.cache.TravelCacheDTO;
@@ -26,16 +27,18 @@ public class AsyncNotificationService {
     private final RedisTrackingService redisTrackingService;
     private final TravelTrackingNotificationService trackingNotificationService;
     private final TravelCacheService travelCacheService;
+    private final TenantFilterAspect tenantFilterAspect;
 
     private final StudentTravelRepository studentTravelRepository;
     private final TravelRepository travelRepository;
 
     private static final Logger logger = LoggerFactory.getLogger(AsyncNotificationService.class);
 
-    public AsyncNotificationService(RedisTrackingService redisTrackingService, TravelTrackingNotificationService trackingNotificationService, TravelCacheService travelCacheService, StudentTravelRepository studentTravelRepository, TravelRepository travelRepository) {
+    public AsyncNotificationService(RedisTrackingService redisTrackingService, TravelTrackingNotificationService trackingNotificationService, TravelCacheService travelCacheService, TenantFilterAspect tenantFilterAspect, StudentTravelRepository studentTravelRepository, TravelRepository travelRepository) {
         this.redisTrackingService = redisTrackingService;
         this.trackingNotificationService = trackingNotificationService;
         this.travelCacheService = travelCacheService;
+        this.tenantFilterAspect = tenantFilterAspect;
         this.studentTravelRepository = studentTravelRepository;
         this.travelRepository = travelRepository;
     }
@@ -44,6 +47,9 @@ public class AsyncNotificationService {
     @Async(value = "notificationTaskExecutor")
     public void processNotificationType(VehicleMovementNotificationDTO vehicleMovementNotificationDTO, ShouldNotify shouldNotify) {
         UUID travelId = vehicleMovementNotificationDTO.travelId();
+
+        // ativa o filtro do customerId antes de qualquer acesso ao banco
+        tenantFilterAspect.applyFilter();
 
         // busca cache estático da viagem para conseguir dados como customerId
         TravelCacheDTO travelStaticCache = travelCacheService.getOrLoadTravelStaticCache(travelId);

@@ -1,6 +1,5 @@
 package com.travel_system.backend_app.exceptions.catchException;
 
-import com.google.api.Http;
 import com.travel_system.backend_app.exceptions.*;
 import com.travel_system.backend_app.exceptions.standardError.StandardError;
 import jakarta.persistence.EntityNotFoundException;
@@ -32,8 +31,8 @@ public class CapturedAndCustomizedExceptions {
         return buildErrorCustomerResponse(ex, webRequest, HttpStatus.FORBIDDEN);
     }
 
-    @ExceptionHandler(EmptyMandatoryFieldsFound.class)
-    public final ResponseEntity<StandardError> emptyMandatoryFieldsException(EmptyMandatoryFieldsFound ex, WebRequest webRequest) {
+    @ExceptionHandler(EmptyMandatoryFieldsFoundException.class)
+    public final ResponseEntity<StandardError> emptyMandatoryFieldsException(EmptyMandatoryFieldsFoundException ex, WebRequest webRequest) {
         return buildErrorCustomerResponse(ex, webRequest, HttpStatus.BAD_REQUEST);
     }
 

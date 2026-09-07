@@ -8,6 +8,7 @@ import com.auth0.jwt.interfaces.DecodedJWT;
 import com.travel_system.backend_app.exceptions.InvalidJwtAuthenticationToken;
 import com.travel_system.backend_app.model.dtos.response.LoginResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.RefreshTokenResponseDTO;
+import com.travel_system.backend_app.model.enums.UserAccountType;
 import jakarta.annotation.PostConstruct;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.beans.factory.annotation.Value;
@@ -48,17 +49,17 @@ public class TokenConfig {
         algorithm = Algorithm.HMAC256(secret.getBytes());
     }
 
-    public LoginResponseDTO createAccessToken(String email, List<String> roles, UUID customerId)  {
+    public LoginResponseDTO createAccessToken(String email, List<String> roles, UUID customerId, UserAccountType userAccountType)  {
         Instant now = Instant.now();
         Instant validity = now.plus(validityInMilliseconds, ChronoUnit.MILLIS);
 
-        var accessToken = getAccessToken(email, roles, now, validity, customerId);
-        var refreshToken = getRefreshToken(email, roles, now, customerId);
+        var accessToken = getAccessToken(email, roles, now, validity, customerId, userAccountType);
+        var refreshToken = getRefreshToken(email, roles, now, customerId, userAccountType);
 
         return new LoginResponseDTO(email, true, now, validity, accessToken, refreshToken);
     }
 
-    private String getAccessToken(String email, List<String> roles, Instant now, Instant validity, UUID customerId) {
+    private String getAccessToken(String email, List<String> roles, Instant now, Instant validity, UUID customerId, UserAccountType userAccountType) {
         String issuerUri = ServletUriComponentsBuilder.fromCurrentContextPath().build().toUriString();
 
         JWTCreator.Builder builder = JWT.create()
@@ -68,14 +69,14 @@ public class TokenConfig {
                 .withSubject(email)
                 .withIssuer(issuerUri);
 
-        if (!isPlatformAdmin(roles)) {
+        if (!isPlatformAdmin(roles) && userAccountType != UserAccountType.UNASSIGNED) {
             builder.withClaim("customerId", customerId.toString());
         }
 
         return builder.sign(algorithm).strip();
     }
 
-    private String getRefreshToken(String email, List<String> roles, Instant now, UUID customerId) {
+    private String getRefreshToken(String email, List<String> roles, Instant now, UUID customerId, UserAccountType userAccountType) {
         Instant validityRefreshToken = now.plus(validityInMilliseconds * 3, ChronoUnit.MILLIS);
 
         JWTCreator.Builder builder = JWT.create()
@@ -84,14 +85,14 @@ public class TokenConfig {
                 .withExpiresAt(validityRefreshToken)
                 .withSubject(email);
 
-        if (!isPlatformAdmin(roles)) {
+        if (!isPlatformAdmin(roles) && userAccountType != UserAccountType.UNASSIGNED) {
             builder.withClaim("customerId", customerId.toString());
         }
 
         return builder.sign(algorithm).strip();
     }
 
-    public RefreshTokenResponseDTO refreshToken(String refreshToken) {
+    public RefreshTokenResponseDTO refreshToken(String refreshToken, UserAccountType userAccountType) {
         if (refreshToken.contains("Bearer ")) refreshToken = refreshToken.substring("Bearer ".length());
 
         JWTVerifier jwtVerifier = JWT.require(algorithm).build();
@@ -102,13 +103,13 @@ public class TokenConfig {
 
         UUID customerId = null;
 
-        if (!isPlatformAdmin(roles)) {
+        if (!isPlatformAdmin(roles) && userAccountType != UserAccountType.UNASSIGNED) {
             String strCustomerId = decodedJWT.getClaim("customerId").asString();
             customerId = UUID.fromString(strCustomerId);
         }
 
         // chama o metodo e retorna somente os campos necessários
-        LoginResponseDTO token = createAccessToken(email, roles, customerId);
+        LoginResponseDTO token = createAccessToken(email, roles, customerId, userAccountType);
 
         return new RefreshTokenResponseDTO(token.accessToken(), token.refreshToken(), token.expiration());
     }
@@ -163,5 +164,11 @@ public class TokenConfig {
         DecodedJWT decodedJWT = decodedToken(token);
 
         return decodedJWT.getClaim("roles").asList(String.class);
+    }
+
+    public String getUsernameFromToken(String token) {
+        DecodedJWT decodedJWT = decodedToken(token);
+
+        return decodedJWT.getClaim("email").asString();
     }
 }

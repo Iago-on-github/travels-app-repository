@@ -4,9 +4,7 @@ import com.travel_system.backend_app.model.RouteStop;
 import com.travel_system.backend_app.model.StandardRoute;
 import com.travel_system.backend_app.model.dtos.request.StandardRouteRequestDTO;
 import com.travel_system.backend_app.model.dtos.request.StandardRouteUpdateDTO;
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-import org.mapstruct.MappingTarget;
+import org.mapstruct.*;
 
 import java.util.UUID;
 
@@ -26,5 +24,6 @@ public interface StandardRouteRequestMapper {
     @Mapping(target = "originLongitude", ignore = true)
     @Mapping(target = "destinationLatitude", ignore = true)
     @Mapping(target = "destinationLongitude", ignore = true)
+    @BeanMapping(nullValuePropertyMappingStrategy = NullValuePropertyMappingStrategy.IGNORE)
     void standardRouteUpdateFromDTO(StandardRouteUpdateDTO updateDTO, @MappingTarget StandardRoute standardRoute);
 }

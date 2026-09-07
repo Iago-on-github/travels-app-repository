@@ -2,33 +2,27 @@ package com.travel_system.backend_app.service;
 
 import com.mapbox.geojson.Point;
 import com.travel_system.backend_app.exceptions.*;
+import com.travel_system.backend_app.infrastructure.TenantContext;
 import com.travel_system.backend_app.interfaces.mappers.StandardRouteRequestMapper;
-import com.travel_system.backend_app.interfaces.mappers.StandardRouteResponseMapper;
-import com.travel_system.backend_app.model.RouteStop;
-import com.travel_system.backend_app.model.RouteStopAssignment;
-import com.travel_system.backend_app.model.StandardRoute;
-import com.travel_system.backend_app.model.UserModel;
+import com.travel_system.backend_app.interfaces.mappers.response.StandardRouteResponseMapper;
+import com.travel_system.backend_app.model.*;
 import com.travel_system.backend_app.model.dtos.mapboxApi.RouteDetailsDTO;
 import com.travel_system.backend_app.model.dtos.request.*;
 import com.travel_system.backend_app.model.dtos.response.RouteStopAssignmentResponseDTO;
-import com.travel_system.backend_app.model.dtos.response.RouteStopResponseDTO;
 import com.travel_system.backend_app.model.dtos.response.StandardRouteResponseDTO;
 import com.travel_system.backend_app.model.enums.GeneralStatus;
 import com.travel_system.backend_app.model.enums.TravelPeriod;
+import com.travel_system.backend_app.repository.AdministratorRepository;
 import com.travel_system.backend_app.repository.RouteStopRepository;
 import com.travel_system.backend_app.repository.StandardRouteRepository;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import jakarta.persistence.EntityNotFoundException;
-import org.jspecify.annotations.NonNull;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import javax.validation.Valid;
-import javax.validation.constraints.NotNull;
 import java.time.Instant;
 import java.util.*;
 import java.util.function.Function;
@@ -38,7 +32,8 @@ import java.util.stream.Collectors;
 public class StandardRouteService {
     private final StandardRouteRepository standardRouteRepository;
     private final RouteStopRepository routeStopRepository;
-    private final UserRepository userRepository;
+    private final UserAccountRepository userAccountRepository;
+    private final AdministratorRepository administratorRepository;
 
     private final StandardRouteRequestMapper standardRouteRequestMapper;
     private final StandardRouteResponseMapper standardRouteResponseMapper;
@@ -46,10 +41,11 @@ public class StandardRouteService {
     private final CurrentUserService currentUserService;
     private final MapboxAPIService mapboxAPIService;
 
-    public StandardRouteService(StandardRouteRepository standardRouteRepository, RouteStopRepository routeStopRepository, UserRepository userRepository, StandardRouteRequestMapper standardRouteRequestMapper, StandardRouteResponseMapper standardRouteResponseMapper, CurrentUserService currentUserService, MapboxAPIService mapboxAPIService) {
+    public StandardRouteService(StandardRouteRepository standardRouteRepository, RouteStopRepository routeStopRepository, UserAccountRepository userAccountRepository, AdministratorRepository administratorRepository, StandardRouteRequestMapper standardRouteRequestMapper, StandardRouteResponseMapper standardRouteResponseMapper, CurrentUserService currentUserService, MapboxAPIService mapboxAPIService) {
         this.standardRouteRepository = standardRouteRepository;
         this.routeStopRepository = routeStopRepository;
-        this.userRepository = userRepository;
+        this.userAccountRepository = userAccountRepository;
+        this.administratorRepository = administratorRepository;
         this.standardRouteRequestMapper = standardRouteRequestMapper;
         this.standardRouteResponseMapper = standardRouteResponseMapper;
         this.currentUserService = currentUserService;
@@ -79,7 +75,9 @@ public class StandardRouteService {
     }
 
     @Transactional(readOnly = true)
-    public Page<StandardRouteResponseDTO> getAllStandardRouteByCustomer(UUID customerId) {
+    public Page<StandardRouteResponseDTO> getAllStandardRouteByCustomer() {
+        UUID customerId = TenantContext.getCurrentTenant();
+
         // permitido apenas caso seja platformADM
         if (!currentUserService.isPlatformAdmin()) {
             throw new NotAuthorizedException("Apenas administradores da plataforma podem realizar essa consulta");
@@ -120,23 +118,30 @@ public class StandardRouteService {
 
     @Transactional
     public StandardRouteResponseDTO createStandardRoute(String authenticatedEmail, StandardRouteRequestDTO standardRouteRequestDTO) {
-        UserModel authenticatedUser = userRepository.findUserByEmail(authenticatedEmail);
+        UserAccount authenticatedUser = userAccountRepository.findUserByEmail(authenticatedEmail);
 
         if (authenticatedUser == null) throw new EntityNotFoundException("Usuário com o email " + authenticatedEmail + " não encontrado");
 
-        // verifica se é um admin
+        // verifica se é um admin válido
         checkAdminPrivileges(authenticatedUser);
-        checkValidAdmin(authenticatedUser); // verifica se o user é válido
+        checkValidAdmin(authenticatedUser);
 
         if (standardRouteRequestDTO.routeStops().isEmpty()) {
             throw new DomainValidationException("A rota padrão deve possuir ao menos um ponto de parada");
         }
 
-        StandardRoute standardRoute = standardRouteRequestMapper.toEntity(standardRouteRequestDTO); // mapper DTO -> entity
+        // obtém o customerID do contexto atual e valida existência
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null ) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido");
+        }
 
-        boolean isDuplicatedName = standardRouteRepository.existsByRouteNameAndCustomerId(standardRouteRequestDTO.routeName(), authenticatedUser.getCustomerId());
+        // valida duplicação do Nome no Customer
+        if (standardRouteRepository.existsByRouteNameAndCustomerId(standardRouteRequestDTO.routeName(), customerId)) {
+            throw new DuplicateResourceException("Já existe uma rota com o nome: " + standardRouteRequestDTO.routeName());
+        }
 
-        if (isDuplicatedName) throw new DuplicateResourceException("Já existe uma rota com o nome: " + standardRouteRequestDTO.routeName());
+        StandardRoute standardRoute = standardRouteRequestMapper.toEntity(standardRouteRequestDTO);
 
         // valida a ordem de parada não deixando ela se repetir (ex.: parada 1 (0), parada 4(0) e não deixando ser null
         List<Integer> stopSequence = standardRouteRequestDTO.routeStops().stream()
@@ -163,11 +168,16 @@ public class StandardRouteService {
             throw new DomainValidationException("Um mesmo RouteStop não pode ser utilizado mais de uma vez na mesma rota");
         }
 
-        standardRoute.setCustomerId(authenticatedUser.getCustomerId()); // deve ser o mesmo Customer do usuário autenticado
-
         List<RouteStop> routeStops = routeStopRepository.findAllById(routeStopIds);
 
-        if (routeStops.isEmpty()) throw new EntityNotFoundException("Nenhum RouteStop encontrado");
+        // validação de existência dos routestops
+        if (routeStops.isEmpty()) {
+            throw new EntityNotFoundException("Nenhum RouteStop encontrado");
+        }
+
+        if (routeStops.size() != standardRouteRequestDTO.routeStops().size()) {
+            throw new EntityNotFoundException("Um ou mais RouteStops do DTO não foram encontrados");
+        }
 
         boolean isInactiveRouteStop = routeStops.stream()
                 .anyMatch(routeStop -> routeStop.getStatus() == GeneralStatus.INACTIVE);
@@ -182,16 +192,14 @@ public class StandardRouteService {
                         Function.identity()
                 ));
 
-
+        // realiza a construção dos assignments
         List<RouteStopAssignment> assignments = standardRouteRequestDTO.routeStops().stream()
                 .map(request -> {
                     RouteStop routeStop = routeStopsById.get(request.routeStopId());
 
                     if (routeStop == null) throw new EntityNotFoundException("RouteStop não encontrado");
 
-                    validateSameCustomer(
-                            routeStop.getCustomerId(),
-                            standardRoute.getCustomerId());
+                    validateSameCustomer(customerId, routeStop.getCustomerId());
 
                     RouteStopAssignment assignment = new RouteStopAssignment();
 
@@ -226,29 +234,37 @@ public class StandardRouteService {
         // importante: caso o cascade do relacionamento seja removido é necessário salvar o RouteStopAssignments explicitamente
         StandardRoute savedStandardRoute = standardRouteRepository.save(standardRoute);
 
-
         return standardRouteResponseMapper.toDTO(savedStandardRoute);
     }
 
     @Transactional
     public StandardRouteResponseDTO updateStandardRoute(UUID standardRouteId, String authenticatedEmail, StandardRouteUpdateDTO standardRouteUpdateDTO) {
-        UserModel authenticatedUser = userRepository.findUserByEmail(authenticatedEmail);
+        UserAccount authenticatedUser = userAccountRepository.findUserByEmail(authenticatedEmail);
 
         if (authenticatedUser == null) throw new EntityNotFoundException("Usuário com o email " + authenticatedEmail + " não encontrado");
 
         // verifica se é um ADMIN
         checkAdminPrivileges(authenticatedUser);
-        checkValidAdmin(authenticatedUser); // verifca se o user é válido (status, customer existe)
+        checkValidAdmin(authenticatedUser);
 
-        boolean isDuplicatedName = standardRouteRepository.existsByRouteNameAndCustomerIdAndIdNot(standardRouteUpdateDTO.routeName(), authenticatedUser.getCustomerId(), standardRouteId);
-
-        if (isDuplicatedName) throw new IllegalArgumentException("Já existe uma rota com o nome: " + standardRouteUpdateDTO.routeName());
+        // obtém o customerID do contexto atual e valida existência
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null ) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido");
+        }
 
         StandardRoute standardRoute = standardRouteRepository.findById(standardRouteId)
                 .orElseThrow(() -> new EntityNotFoundException("Rota padrão não encontrada: " + standardRouteId));
 
         // devem ser do mesmo Customer
-        validateSameCustomer(standardRoute.getCustomerId(), authenticatedUser.getCustomerId());
+        validateSameCustomer(standardRoute.getCustomerId(), customerId);
+
+        // validação de duplicação de nome
+        if (standardRouteUpdateDTO.routeName() != null && standardRouteUpdateDTO.routeName().equals(standardRoute.getRouteName())) {
+            if (standardRouteRepository.existsByRouteNameAndCustomerIdAndIdNot(standardRouteUpdateDTO.routeName(), customerId, standardRouteId)){
+                throw new IllegalArgumentException("Já existe uma rota com o nome: " + standardRouteUpdateDTO.routeName());
+            }
+        }
 
         /*
         * valida o input das coordenadas de origem e destino
@@ -275,8 +291,14 @@ public class StandardRouteService {
         Double destinationLat = destinationLatitudeFromDTO ? standardRouteUpdateDTO.destinationLatitude() : standardRoute.getDestinationLatitude();
         Double destinationLng = destinationLongitudeFromDTO ? standardRouteUpdateDTO.destinationLongitude() : standardRoute.getDestinationLongitude();
 
-        List<RouteStopAssignment> routeStopAssignments = standardRoute.getRouteStopAssignments().stream()
-                .sorted(Comparator.comparing(RouteStopAssignment::getSequence)).toList();
+        standardRouteRequestMapper.standardRouteUpdateFromDTO(standardRouteUpdateDTO, standardRoute);
+
+        // busca os assignments, em caso de null lança List.of para evitar NPE
+        List<RouteStopAssignment> routeStopAssignments = standardRoute.getRouteStopAssignments() != null
+                ? standardRoute.getRouteStopAssignments().stream()
+                .sorted(Comparator.comparing(RouteStopAssignment::getSequence))
+                .toList()
+                : List.of();
 
         // waypoints (pontos de parada) aqui não muda, busca pelo já armazenado
         List<Point> defaultWaypoints = buildWaypoints(routeStopAssignments);
@@ -297,10 +319,6 @@ public class StandardRouteService {
         }
 
         standardRoute.setStandardGeometry(routeDetailsDTO.geometry());
-        standardRoute.setUpdatedAt(Instant.now());
-
-        // mapper para atualizar os campos
-        standardRouteRequestMapper.standardRouteUpdateFromDTO(standardRouteUpdateDTO, standardRoute);
 
         StandardRoute savedStandardRoute = standardRouteRepository.save(standardRoute);
 
@@ -309,27 +327,35 @@ public class StandardRouteService {
 
     @Transactional
     public StandardRouteResponseDTO updateRouteStopPoints(UUID standardRouteId, String authenticatedEmail, StandardRouteStopsUpdateDTO standardRouteStopsUpdateDTO) {
-        UserModel authenticatedUser = userRepository.findUserByEmail(authenticatedEmail);
+        UserAccount authenticatedUser = userAccountRepository.findUserByEmail(authenticatedEmail);
 
         if (authenticatedUser == null) throw new EntityNotFoundException("Usuário com o email " + authenticatedEmail + " não encontrado");
 
         // verifica se é um ADMIN
         checkAdminPrivileges(authenticatedUser);
-        checkValidAdmin(authenticatedUser); // verifca se o user é válido (status, customer existe)
+        checkValidAdmin(authenticatedUser);
+
+        // obtém o customerID do contexto atual e valida existência
+        UUID customerId = TenantContext.getCurrentTenant();
+        if (customerId == null ) {
+            throw new DomainValidationException("É necessário estar atuando sobre um Customer válido");
+        }
 
         StandardRoute standardRoute = standardRouteRepository.findById(standardRouteId)
                 .orElseThrow(() -> new EntityNotFoundException("Entidade standardRoute não encontrada"));
 
-        validateSameCustomer(authenticatedUser.getCustomerId(), standardRoute.getCustomerId());
+        validateSameCustomer(customerId, standardRoute.getCustomerId());
 
         if (standardRouteStopsUpdateDTO == null || standardRouteStopsUpdateDTO.routeStops() == null || standardRouteStopsUpdateDTO.routeStops().isEmpty()) {
             throw new DomainValidationException("A rota padrão deve possuir ao menos um ponto de parada");
         }
 
+        // pega os pontos de parada do DTO
         List<RouteStopAssignmentRequestDTO> requestedStops = standardRouteStopsUpdateDTO.routeStops().stream().toList();
 
         List<Integer> sequence = requestedStops.stream().map(RouteStopAssignmentRequestDTO::stopSequence).toList();
 
+        // realiza a gama de validações com base na sequence extraída do DTO
         if (sequence.stream().anyMatch(Objects::isNull)) {
             throw new DomainValidationException("A sequência de RouteStops não pode ser null");
         }
@@ -358,6 +384,10 @@ public class StandardRouteService {
             throw new EntityNotFoundException("Nenhum RouteStop encontrado");
         }
 
+        if (routeStops.size() != standardRouteStopsUpdateDTO.routeStops().size()) {
+            throw new EntityNotFoundException("Um ou mais RouteStops não foram encontrados");
+        }
+
         boolean hasInactiveRouteStop = routeStops.stream()
                 .anyMatch(routeStop -> routeStop.getStatus() == GeneralStatus.INACTIVE);
 
@@ -372,13 +402,9 @@ public class StandardRouteService {
                         Function.identity() // próprio objeto
                 ));
 
-        // evita que os routeStops requisitados não venham
-        if (routeStops.size() != routeStopIds.size()) {
-            throw new EntityNotFoundException("Um ou mais RouteStops não foram encontrados");
-        }
-
+        // loop validando os customers
         for (RouteStop routeStop : routeStops) {
-            validateSameCustomer(routeStop.getCustomerId(), authenticatedUser.getCustomerId());
+            validateSameCustomer(routeStop.getCustomerId(), customerId);
         }
 
         // cria os novos RouteStopAssignments
@@ -407,18 +433,21 @@ public class StandardRouteService {
 
         standardRoute.setStandardGeometry(routeDetailsDTO.geometry()); // armazena o geometry recalculado
 
-        standardRoute.getRouteStopAssignments().clear(); // limpa os registros antigos (orphanRemoval da entidade)
-        standardRoute.getRouteStopAssignments().addAll(assignments); // persiste através do cascade
-        standardRoute.setUpdatedAt(Instant.now());
+        // realiza limpeza e evita npe
+        if (standardRoute.getRouteStopAssignments() == null) {
+            standardRoute.setRouteStopAssignments(new ArrayList<>());
+        } else {
+            standardRoute.getRouteStopAssignments().clear();
+        }
+
+        // persiste através do cascade
+        standardRoute.getRouteStopAssignments().addAll(assignments);
 
         StandardRoute savedStandardRoute = standardRouteRepository.save(standardRoute);
 
-        // verificar retorno para routeStop
         return standardRouteResponseMapper.toDTO(savedStandardRoute);
     }
 
-
-    // MÉTODOS AUXILIARES
     private List<Point> buildWaypoints(List<RouteStopAssignment> assignmentsOrderedBySequence) {
         return assignmentsOrderedBySequence.stream().map(route -> {
             RouteStop eachRouteStop = route.getRouteStop();
@@ -452,7 +481,7 @@ public class StandardRouteService {
         return routeDetailsDTO;
     }
 
-    private void checkAdminPrivileges(UserModel authenticatedUser) {
+    private void checkAdminPrivileges(UserAccount authenticatedUser) {
         boolean isAdmin = authenticatedUser.getRoles().stream()
                 .anyMatch(role -> role.equals("ROLE_ADMIN") || role.equals("ROLE_PLATFORM_ADMIN"));
 
@@ -461,9 +490,18 @@ public class StandardRouteService {
         }
     }
 
-    private void checkValidAdmin(UserModel authenticatedUser) {
-        if (authenticatedUser.getCustomerId() == null) throw new DomainValidationException("O usuário autenticado não está associado a um Customer");
-        if (authenticatedUser.getStatus().equals(GeneralStatus.INACTIVE)) throw new InactiveAccountModificationException("Usuário não está ativo");
+    private void checkValidAdmin(UserAccount authenticatedUser) {
+        // realiza a validação p/ ver se o Filter do Spring Security conseguiu associar o Tenant (seja pelo JWT ou as act)
+        if (TenantContext.getCurrentTenant() == null) {
+            throw new DomainValidationException("O usuário autenticado não está associado a um Customer nesta requisição.");
+        }
+
+        Administrator admin = administratorRepository.findByEmail(authenticatedUser.getEmail())
+                .orElseThrow(() -> new EntityNotFoundException("Perfil de Administrador não encontrado para este usuário."));
+
+        if (admin.getStatus() == GeneralStatus.INACTIVE) {
+            throw new InactiveAccountModificationException("Usuário não está ativo.");
+        }
     }
 
     private void validateSameCustomer(UUID firstCustomerId, UUID secondCustomerId) {

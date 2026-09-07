@@ -1,99 +1,97 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.exceptions.DuplicateResourceException;
-import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFound;
+import com.travel_system.backend_app.exceptions.EmptyMandatoryFieldsFoundException;
 import com.travel_system.backend_app.exceptions.InactiveAccountModificationException;
-import com.travel_system.backend_app.interfaces.mappers.CustomerMapper;
+import com.travel_system.backend_app.interfaces.mappers.CustomerRequestMapper;
+import com.travel_system.backend_app.interfaces.mappers.response.CustomerResponseMapper;
 import com.travel_system.backend_app.model.City;
 import com.travel_system.backend_app.model.Customer;
-import com.travel_system.backend_app.model.UserModel;
 import com.travel_system.backend_app.model.dtos.request.CustomerRequestDTO;
 import com.travel_system.backend_app.model.dtos.request.CustomerUpdateDTO;
 import com.travel_system.backend_app.model.dtos.response.CustomerResponseDTO;
 import com.travel_system.backend_app.repository.CityRepository;
 import com.travel_system.backend_app.repository.CustomerRepository;
-import com.travel_system.backend_app.repository.UserRepository;
+import com.travel_system.backend_app.repository.UserAccountRepository;
 import jakarta.persistence.EntityNotFoundException;
-import jakarta.transaction.Transactional;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.*;
 
 @Service
 public class CustomerService {
+
     private final CustomerRepository customerRepository;
     private final CityRepository cityRepository;
-    private final UserRepository userRepository;
-    private final CustomerMapper customerMapper;
+    private final UserAccountRepository userAccountRepository;
 
-    public CustomerService(CustomerRepository customerRepository, CityRepository cityRepository, UserRepository userRepository, CustomerMapper customerMapper) {
+    private final CustomerResponseMapper customerResponseMapper;
+    private final CustomerRequestMapper customerRequestMapper;
+
+    public CustomerService(CustomerRepository customerRepository, CityRepository cityRepository, UserAccountRepository userAccountRepository, CustomerResponseMapper customerResponseMapper, CustomerRequestMapper customerRequestMapper) {
         this.customerRepository = customerRepository;
         this.cityRepository = cityRepository;
-        this.userRepository = userRepository;
-        this.customerMapper = customerMapper;
+        this.userAccountRepository = userAccountRepository;
+        this.customerResponseMapper = customerResponseMapper;
+        this.customerRequestMapper = customerRequestMapper;
     }
 
+    @Transactional(readOnly = true)
     public Page<CustomerResponseDTO> getAllCustomers() {
         Pageable pageable = PageRequest.of(0, 10);
 
         Page<Customer> customers = customerRepository.findAll(pageable);
 
-        return customers.map(this::customerResponseDtoMapper);
+        return customers.map(customerResponseMapper::toDTO);
     }
 
+    @Transactional(readOnly = true)
     public CustomerResponseDTO findCustomerById(UUID id) {
         Customer customer = customerRepository.findById(id)
                 .orElseThrow(() -> new EntityNotFoundException("Customer com o id '" + id + "' não encontrado"));
 
-        return customerResponseDtoMapper(customer);
+        return customerResponseMapper.toDTO(customer);
     }
 
+    @Transactional(readOnly = true)
     public CustomerResponseDTO findCustomerBySlug(String slug) {
         Customer customer = customerRepository.findBySlug(slug)
                 .orElseThrow(() -> new EntityNotFoundException("Customer com o slug '" + slug + "' não encontrado"));
 
-        return customerResponseDtoMapper(customer);
+        return customerResponseMapper.toDTO(customer);
     }
 
+    @Transactional(readOnly = true)
     public List<CustomerResponseDTO> findAllByActive(Boolean active) {
-        if (active == null) active = true; // se não for fornecido, trata como true
+        boolean targetStatus = Boolean.TRUE.equals(active);
 
-        List<Customer> customersByStatus = customerRepository.findAllByActive(active);
+        List<Customer> customersByStatus = customerRepository.findAllByActive(targetStatus);
 
-        return customersByStatus.stream().map(this::customerResponseDtoMapper).toList();
+        return customersByStatus.stream().map(customerResponseMapper::toDTO).toList();
     }
 
     @Transactional
     public CustomerResponseDTO createCustomer(CustomerRequestDTO customerRequestDTO) {
-        validateRequireFields(customerRequestDTO); // valida preenchimento de campos obrigatórios
+        // valida preenchimento de campos obrigatórios
+        validateRequireFields(customerRequestDTO);
 
         City city = cityRepository.findById(customerRequestDTO.cityId()).orElseThrow(() -> new EntityNotFoundException("City não encontrada."));
 
-        boolean isCnpjAlreadyExists = customerRepository.findByCnpj(customerRequestDTO.cnpj()).isPresent();
-
-        if (isCnpjAlreadyExists) throw new DuplicateResourceException("Customer com o CNPJ " + customerRequestDTO.cnpj() + " já existe na base de dados.");
-
-        Customer customer = customerMapper(customerRequestDTO);
-        customer.setCity(city);
-        Customer savedCustomer = customerRepository.save(customer);
-
-        if (customerRequestDTO.userIds() != null && !customerRequestDTO.userIds().isEmpty()) {
-            List<UserModel> users = userRepository.findAllById(customerRequestDTO.userIds());
-
-            if (users.size() != customerRequestDTO.userIds().size()) {
-                throw new EntityNotFoundException("Um ou mais usuários informados não foram encontrados");
-            }
-
-            users.forEach(user -> user.setCustomerId(savedCustomer.getId()));
-            userRepository.saveAll(users);
+        // valida existência de CNPJ
+        if (customerRepository.existsByCnpj(customerRequestDTO.cnpj())) {
+            throw new DuplicateResourceException("Customer com o CNPJ " + customerRequestDTO.cnpj() + " já existe na base de dados.");
         }
 
-        return customerResponseDtoMapper(customer);
+        Customer customer = customerRequestMapper.toEntity(customerRequestDTO);
+        customer.setCity(city);
+
+        Customer savedCustomer = customerRepository.save(customer);
+
+        return customerResponseMapper.toDTO(savedCustomer);
     }
 
     @Transactional
@@ -103,12 +101,9 @@ public class CustomerService {
 
         if (!customer.isActive()) throw new InactiveAccountModificationException("Customer não está ativo.");
 
-        customerMapper.customerMapper(customerUpdateDTO, customer);
-        customer.setUpdatedAt(Instant.now());
+        customerRequestMapper.updateEntityFromDTO(customerUpdateDTO, customer);
 
-        customerRepository.save(customer);
-
-        return customerResponseDtoMapper(customer);
+        return customerResponseMapper.toDTO(customerRepository.save(customer));
     }
 
     @Transactional
@@ -119,40 +114,13 @@ public class CustomerService {
         if (customer.isActive() == isEnabled) throw new InactiveAccountModificationException("Customer já inativo no sistema");
 
         customer.setActive(isEnabled);
+
+        customerRepository.save(customer);
     }
 
     private void validateRequireFields(CustomerRequestDTO customerRequestDTO) {
-        if (customerRequestDTO.name() == null || customerRequestDTO.slug() == null || customerRequestDTO.cityId() == null || customerRequestDTO.userIds() == null
-        || customerRequestDTO.clientSector() == null) {
-            throw new EmptyMandatoryFieldsFound("Preencha todos os campos obrigatórios");
+        if (customerRequestDTO.name() == null || customerRequestDTO.slug() == null || customerRequestDTO.cityId() == null || customerRequestDTO.clientSector() == null) {
+            throw new EmptyMandatoryFieldsFoundException("Preencha todos os campos obrigatórios");
         }
-    }
-
-    private CustomerResponseDTO customerResponseDtoMapper(Customer customer) {
-        return new CustomerResponseDTO(
-                customer.getId(),
-                customer.getName(),
-                customer.getSlug(),
-                customer.getCnpj(),
-                customer.isActive(),
-                customer.getCity(),
-                customer.getClientSector(),
-                customer.getProfilePicture(),
-                customer.getCreatedAt()
-        );
-    }
-
-    private Customer customerMapper(CustomerRequestDTO customerRequestDTO) {
-        Customer customer = new Customer();
-
-        customer.setName(customerRequestDTO.name());
-        customer.setSlug(customerRequestDTO.slug());
-        customer.setCnpj(customerRequestDTO.cnpj());
-        customer.setActive(true);
-        customer.setClientSector(customerRequestDTO.clientSector());
-        customer.setProfilePicture(customerRequestDTO.profilePicture());
-        customer.setCreatedAt(Instant.now());
-
-        return customer;
     }
 }

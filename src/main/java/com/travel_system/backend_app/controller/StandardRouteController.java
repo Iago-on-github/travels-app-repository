@@ -103,12 +103,10 @@ public class StandardRouteController {
             @ApiResponse(responseCode = "403", description = "Acesso negado. O usuário autenticado não possui o perfil 'ROLE_PLATFORM_ADMIN'.",
                     content = @Content(schema = @Schema(hidden = true)))
     })
-    @GetMapping("/{customerId}/customer")
-    public ResponseEntity<Page<StandardRouteResponseDTO>> getAllStandardRouteByCustomer(
-            @Parameter(description = "ID único (UUID) do Customer cujas rotas padrão serão listadas.", required = true)
-            @PathVariable UUID customerId) {
+    @GetMapping("/customer")
+    public ResponseEntity<Page<StandardRouteResponseDTO>> getAllStandardRouteByCustomer() {
 
-        return ResponseEntity.ok().body(standardRouteService.getAllStandardRouteByCustomer(customerId));
+        return ResponseEntity.ok().body(standardRouteService.getAllStandardRouteByCustomer());
     }
 
     @Operation(

@@ -81,9 +81,7 @@ public class AuthController {
             customerId = tokenConfig.getCustomerIdFromToken(refreshToken);
         }
 
-        String email = tokenConfig.getSubjectFromToken(refreshToken);
-
-        var token = authService.refreshToken(email, refreshToken, customerId);
+        var token = authService.refreshToken(refreshToken, customerId);
 
         return ResponseEntity.ok().body(token);
     }
