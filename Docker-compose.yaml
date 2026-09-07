@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   rabbitmq:
     image: rabbitmq:3-management
@@ -36,6 +34,34 @@ services:
       mynet:
         aliases:
           - my-localhost
+
+  app:
+    volumes:
+      - ./travels-app-firebase-config.json:/app/firebase-config.json
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: spring-app
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=dev
+      - SPRING_RABBITMQ_HOST=rabbitmq-dev
+      - SPRING_RABBITMQ_PORT=5672
+      - SPRING_RABBITMQ_USERNAME=${RABBITMQ_USER}
+      - SPRING_RABBITMQ_PASSWORD=${RABBITMQ_PASSWORD}
+      - DB_USERNAME=${DB_USERNAME}
+      - DB_PASSWORD=${DB_PASSWORD}
+      - CACHE_PASSWORD=${CACHE_PASSWORD}
+      - JWT_SECRET=${JWT_SECRET}
+      - MAPBOX-ACCESS-TOKEN=${MAPBOX-ACCESS-TOKEN}
+      - FIREBASE_CONFIG_PATH=/app/firebase-config.json
+    depends_on:
+      - rabbitmq
+      - minio
+    restart: unless-stopped
+    networks:
+      - mynet
 
 networks:
   mynet:

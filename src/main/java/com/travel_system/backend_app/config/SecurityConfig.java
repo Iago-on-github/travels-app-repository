@@ -123,6 +123,7 @@ public class SecurityConfig {
                 .requestMatchers("/v1/auth/**").permitAll() // endpoints de login
                 .requestMatchers("/v1/messaging/auth/**").permitAll() // servidor externo do rabbitmq
                 .requestMatchers("/api/private-test/**").permitAll(); // testes
+                auth.requestMatchers("/actuator/**").permitAll();
 //                .requestMatchers("/v1/current/**").permitAll(); // testes
     }
 

@@ -26,9 +26,9 @@ public class RabbitMQAuthService {
     private final DriverRepository driverRepository;
     private final UserAccountRepository userAccountRepository;
 
-    @Value("${rabbitmq_user}")
+    @Value("${spring.rabbitmq.username}")
     private String rabbitmq_user;
-    @Value("${rabbitmq_password}")
+    @Value("${spring.rabbitmq.password}")
     private String rabbitmq_password;
 
     private final Logger log = LoggerFactory.getLogger(RabbitMQAuthService.class);

@@ -34,3 +34,5 @@ build/
 
 # environment
 .env
+
+/travels-app-firebase-config.json
