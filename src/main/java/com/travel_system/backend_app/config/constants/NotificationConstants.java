@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit;
 
 public class NotificationConstants {
 
-    private NotificationConstants() {
+    public NotificationConstants() {
         throw new UnsupportedOperationException("Não é possível instanciar uma classe de constantes");
     }
 

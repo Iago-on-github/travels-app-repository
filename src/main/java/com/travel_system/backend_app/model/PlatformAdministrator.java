@@ -18,11 +18,11 @@ public class PlatformAdministrator {
     private String name;
     private String profilePicture;
 
-    public PlatformAdministrator(UUID id, UserAccount userAccount, String profilePicture, String name) {
+    public PlatformAdministrator(UUID id, UserAccount userAccount, String profilePicture) {
         this.id = id;
         this.userAccount = userAccount;
         this.profilePicture = profilePicture;
-        this.name = name;
+        this.name = "ZYGGO ADMINISTRATOR";
     }
 
     public UUID getId() {

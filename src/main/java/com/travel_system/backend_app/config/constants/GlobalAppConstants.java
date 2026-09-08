@@ -4,7 +4,7 @@ import java.util.concurrent.TimeUnit;
 
 public class GlobalAppConstants {
 
-    private GlobalAppConstants() {
+    public GlobalAppConstants() {
         throw new UnsupportedOperationException("Não é possível instanciar uma classe de constantes");
     }
 

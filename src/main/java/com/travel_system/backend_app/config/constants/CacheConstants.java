@@ -2,16 +2,16 @@ package com.travel_system.backend_app.config.constants;
 
 public class CacheConstants {
 
-    private CacheConstants() {
+    public CacheConstants() {
         throw new UnsupportedOperationException("Não é possível instanciar uma classe de constantes");
     }
 
     public static final String STUDENT_TRAVEL_ROUTE_STOPS_KEY = "travel:student:route-stops:";
 
-    // ## redis notification
+    // redis notification
     public static final String HASH_KEY_PREFIX = "notification:";
 
-    // ## redis tracking
+    // redis tracking
     public static final String SET_KEY = "ACTIVE_TRAVELS_KEY";
 
     public static final String TRACKING_KEY_PREFIX = "travel:tracking:";
@@ -22,4 +22,7 @@ public class CacheConstants {
 
     // travel static cache
     public static final String TRAVEL_STATIC_CACHE = "trip:static:";
+
+    // setup authentication
+    public static final String SETUP_AUTH_PLATFORM_ADMIN_KEY = "set-up:PLATFORM_ADMINISTRATOR:";
 }
