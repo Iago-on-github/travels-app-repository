@@ -62,6 +62,8 @@ public class SecurityConfig {
                     configureStandardRouteEndpoints(auth);
                     configureCustomersEndpoints(auth);
                     configureAdminsEndpoints(auth);
+                    configurePlatformAdministratorEndpoints(auth);
+                    configureSetupAuthenticationEndpoints(auth);
                     configureAnyRequireAuthEndpoints(auth);
                 })
                 // tratamento de exceptions do spring security
@@ -122,9 +124,8 @@ public class SecurityConfig {
         auth
                 .requestMatchers("/v1/auth/**").permitAll() // endpoints de login
                 .requestMatchers("/v1/messaging/auth/**").permitAll() // servidor externo do rabbitmq
-                .requestMatchers("/api/private-test/**").permitAll(); // testes
-                auth.requestMatchers("/actuator/**").permitAll();
-//                .requestMatchers("/v1/current/**").permitAll(); // testes
+                .requestMatchers("/api/private-test/**").permitAll() // testes
+                .requestMatchers("/actuator/**").permitAll();
     }
 
     private void configureAdminsEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
@@ -171,6 +172,18 @@ public class SecurityConfig {
         auth.requestMatchers("/v1/route-assignment/{routeStopId}/remove/{standardRouteId}").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_USER);
 
         auth.requestMatchers("/v1/route-stop-students/**").hasAnyRole(ROLE_ADMIN, ROLE_PLATFORM_ADMIN, ROLE_USER, ROLE_DRIVER);
+    }
+
+    private void configurePlatformAdministratorEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth
+                .requestMatchers("/new").hasRole(ROLE_PLATFORM_ADMIN)
+                .requestMatchers("/v1/internal/platform-admin/bootstrap").permitAll();
+
+    }
+
+    private void configureSetupAuthenticationEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
+        auth.requestMatchers("/v1/auth/set-up").hasRole(ROLE_PLATFORM_ADMIN);
+
     }
 
     private void configureAnyRequireAuthEndpoints(AuthorizeHttpRequestsConfigurer<?>.AuthorizationManagerRequestMatcherRegistry auth) {
