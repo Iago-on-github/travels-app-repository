@@ -1,32 +1,15 @@
 package com.travel_system.backend_app.service;
 
 import com.travel_system.backend_app.config.TokenConfig;
-import com.travel_system.backend_app.model.Customer;
-import com.travel_system.backend_app.model.dtos.request.LoginRequestDTO;
-import com.travel_system.backend_app.model.dtos.response.LoginResponseDTO;
-import com.travel_system.backend_app.model.dtos.response.RefreshTokenResponseDTO;
+import com.travel_system.backend_app.model.dtos.security.LoginRequestDTO;
+import com.travel_system.backend_app.model.dtos.security.LoginResponseDTO;
+import com.travel_system.backend_app.model.dtos.security.RefreshTokenResponseDTO;
 import com.travel_system.backend_app.repository.UserAccountRepository;
-import jakarta.persistence.EntityNotFoundException;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Nested;
-import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {

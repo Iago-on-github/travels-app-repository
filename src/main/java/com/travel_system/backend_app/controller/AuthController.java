@@ -1,9 +1,9 @@
 package com.travel_system.backend_app.controller;
 
 import com.travel_system.backend_app.config.TokenConfig;
-import com.travel_system.backend_app.model.dtos.request.LoginRequestDTO;
-import com.travel_system.backend_app.model.dtos.response.LoginResponseDTO;
-import com.travel_system.backend_app.model.dtos.response.RefreshTokenResponseDTO;
+import com.travel_system.backend_app.model.dtos.security.LoginRequestDTO;
+import com.travel_system.backend_app.model.dtos.security.LoginResponseDTO;
+import com.travel_system.backend_app.model.dtos.security.RefreshTokenResponseDTO;
 import com.travel_system.backend_app.service.AuthService;
 import com.travel_system.backend_app.service.CurrentUserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,9 +12,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
