@@ -14,20 +14,6 @@ public record PlatformAdministratorRequestDTO(
         @NotNull
         @Min(7)
         @NotBlank(message = "Campo 'Senha' é obrigatório")
-        String password,
-        @NotNull
-        @Min(4)
-        @NotBlank(message = "Campo 'Nome' é obrigatório")
-        String name,
-        String lastName,
-        @NotNull
-        @NotBlank
-        @Min(11)
-        String cpf,
-        String birthDate,
-        @NotNull
-        @Min(8)
-        @NotBlank(message = "Campo 'Telefone' é obrigatório")
-        String telephone
+        String password
 ) {
 }
