@@ -56,6 +56,11 @@ public class CapturedAndCustomizedExceptions {
         return buildErrorCustomerResponse(ex, webRequest, HttpStatus.CONFLICT);
     }
 
+    @ExceptionHandler(BootstrapAlreadyCompletedException.class)
+    public final ResponseEntity<StandardError> BootstrapAlreadyCompletedException(BootstrapAlreadyCompletedException ex, WebRequest webRequest) {
+        return buildErrorCustomerResponse(ex, webRequest, HttpStatus.CONFLICT);
+    }
+
     @ExceptionHandler(RecalculateEtaException.class)
     public final ResponseEntity<StandardError> recalculateEtaException(RecalculateEtaException ex, WebRequest webRequest) {
         return buildErrorCustomerResponse(ex, webRequest, HttpStatus.BAD_GATEWAY);
@@ -136,8 +141,28 @@ public class CapturedAndCustomizedExceptions {
         return buildErrorCustomerResponse(ex, webRequest, HttpStatus.BAD_REQUEST);
     }
 
+    @ExceptionHandler(StepUpRequiredException.class)
+    public final ResponseEntity<StandardError> StepUpRequiredException (StepUpRequiredException  ex, WebRequest webRequest) {
+        return buildErrorCustomerResponse(ex, webRequest, HttpStatus.PRECONDITION_REQUIRED);
+    }
+
+    @ExceptionHandler(InvalidBootstrapSecretException.class)
+    public final ResponseEntity<StandardError> InvalidBootstrapSecretException (InvalidBootstrapSecretException  ex, WebRequest webRequest) {
+        return buildErrorCustomerResponse(ex, webRequest, HttpStatus.UNAUTHORIZED);
+    }
+
+    @ExceptionHandler(RateLimitExceededException .class)
+    public final ResponseEntity<StandardError> RateLimitExceededException  (RateLimitExceededException   ex, WebRequest webRequest) {
+        return buildErrorCustomerResponse(ex, webRequest, HttpStatus.TOO_MANY_REQUESTS);
+    }
+
     @ExceptionHandler(RedisConnectionFailureException.class)
     public final ResponseEntity<StandardError> RedisConnectionFailureException (RedisConnectionFailureException  ex, WebRequest webRequest) {
+        return buildErrorCustomerResponse(ex, webRequest, HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+
+    @ExceptionHandler(RateLimitServiceUnavailableException .class)
+    public final ResponseEntity<StandardError> RateLimitServiceUnavailableException  (RateLimitServiceUnavailableException   ex, WebRequest webRequest) {
         return buildErrorCustomerResponse(ex, webRequest, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
