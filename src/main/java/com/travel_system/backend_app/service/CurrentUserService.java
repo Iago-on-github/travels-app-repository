@@ -48,7 +48,7 @@ public class CurrentUserService {
     }
 
     // pega o email do user autenticado
-    public String getAuthenticatedUserEmail() {
+    public static String getAuthenticatedUserEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
 
         if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal().equals("anonymousUser")) {
