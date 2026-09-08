@@ -15,4 +15,8 @@ public interface PlatformAdministratorRepository extends JpaRepository<PlatformA
     @Query("SELECT pa FROM PlatformAdministrator pa WHERE pa.userAccount.email = :email")
     Optional<PlatformAdministrator> findByEmail(@Param("email") String email);
 
+    @Query("SELECT COUNT(pa) > 0 from PlatformAdministrator pa WHERE pa.userAccount.email = :email")
+    boolean existsByEmail(@Param("email") String email);
+
+    boolean existsBy();
 }
